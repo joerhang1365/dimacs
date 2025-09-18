@@ -13,27 +13,27 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_NAME_LEN 50
 #define MAX_INPUTS 100
 #define MAX_OUTPUTS 100
+#define MAX_GATE_INPUTS 100
 #define MAX_GATES 1000
-#define MAX_GATE_INPUTS 10
+#define MAX_NAME 16
 
 enum GATE_TYPE { AND, NAND, OR, NOR, NOT, XOR, BUFF };
 
 struct gate {
     enum GATE_TYPE type;
     int input_cnt;
-    char inputs[MAX_GATE_INPUTS][MAX_NAME_LEN];
-    char output[MAX_NAME_LEN];
+    char inputs[MAX_GATE_INPUTS][MAX_NAME];
+    char output[MAX_NAME];
 };
 
 struct circuit {
     int input_cnt;
     int output_cnt;
     int gate_cnt;
-    char inputs[MAX_INPUTS][MAX_NAME_LEN];
-    char outputs[MAX_OUTPUTS][MAX_NAME_LEN];
+    char inputs[MAX_INPUTS][MAX_NAME];
+    char outputs[MAX_OUTPUTS][MAX_NAME];
     struct gate gates[MAX_GATES];
 };
 
@@ -55,7 +55,19 @@ int main(int argc, char ** args)
     parse_bench(args[1], &a);
     parse_bench(args[2], &b);
 
-    printf("input count: %d", a.input_cnt);
+    printf("input count: %d\n", a.input_cnt);
+
+    for (int i = 0; i < a.input_cnt; i++)
+    {
+        printf("input %d: %s\n", i, a.inputs[i]);
+    }
+
+    printf("output count: %d\n", a.output_cnt);
+
+    for (int i = 0; i < a.output_cnt; i++)
+    {
+        printf("output %d: %s\n", i, a.outputs[i]);
+    }
 
     return 0;
 }
@@ -85,15 +97,21 @@ static void parse_bench(const char * file_name, struct circuit * cir)
 
         if (strncmp(line, "INPUT", 5) == 0)
         {
-            char input[MAX_NAME_LEN];
-            sscanf(line, "INPUT(%s)\n", input);
+            char * input;
+
+            input = strtok(line, "(");
+            input = strtok(NULL, ")");
+
             strcpy(cir->inputs[cir->input_cnt], input);
             cir->input_cnt++;
         }
         else if (strncmp(line, "OUTPUT", 6) == 0)
         {
-            char output[MAX_NAME_LEN];
-            sscanf(line, "OUTPUT(%s)\n", output);
+            char * output;
+
+            output = strtok(line, "(");
+            output = strtok(NULL, ")");
+
             strcpy(cir->outputs[cir->output_cnt], output);
             cir->output_cnt++;
         }
