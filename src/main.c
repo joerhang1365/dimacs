@@ -13,32 +13,32 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_INPUTS 100
-#define MAX_OUTPUTS 100
-#define MAX_GATE_INPUTS 100
-#define MAX_GATES 1000
+#define MAX_INPUTS 64
+#define MAX_OUTPUTS 64
+#define MAX_GATE_INPUTS 64
+#define MAX_GATES 2049
 #define MAX_NAME 16
 
 enum GATE_TYPE { AND, NAND, OR, NOR, NOT, XOR, BUFF };
 
-struct gate {
+typedef struct {
     enum GATE_TYPE type;
     int input_cnt;
     char inputs[MAX_GATE_INPUTS][MAX_NAME];
     char output[MAX_NAME];
-};
+} gate_t;
 
-struct circuit {
+typedef struct {
     int input_cnt;
     int output_cnt;
     int gate_cnt;
     char inputs[MAX_INPUTS][MAX_NAME];
     char outputs[MAX_OUTPUTS][MAX_NAME];
-    struct gate gates[MAX_GATES];
-};
+    gate_t gates[MAX_GATES];
+} circuit_t;
 
-static void parse_bench(const char * file_name, struct circuit * cir);
-static void print_circuit(const struct circuit cir);
+static circuit_t * parse_bench(const char * file_name, const char * prefix);
+static void print_circuit(const circuit_t cir);
 //static struct circuit miter(struct circuit cir_a, struct circuit cir_b);
 //static int tseitin_transform(struct circuit cir);
 
@@ -50,57 +50,56 @@ int main(int argc, char ** args)
         return 1;
     }
 
-    struct circuit a;
-    struct circuit b;
+    circuit_t * a = parse_bench(args[1], "a");
+    circuit_t * b = parse_bench(args[2], "b");
 
-    parse_bench(args[1], &a);
-    parse_bench(args[2], &b);
-
-    print_circuit(a);
+    print_circuit(*a);
+    print_circuit(*b);
 
     return 0;
 }
 
-static void print_circuit(const struct circuit cir)
+static void print_circuit(const circuit_t cir)
 {
-    printf("*** circuit ***\n");
-    printf("\n*** inputs ***\n");
+    printf("\n*** circuit ***\n");
     printf("input count: %d\n", cir.input_cnt);
+    printf("output count: %d\n", cir.output_cnt);
+    printf("gate count: %d\n", cir.gate_cnt);
+    printf("\n");
 
     for (int i = 0; i < cir.input_cnt; i++)
     {
-        printf("input %d: %s;\n", i, cir.inputs[i]);
+        printf("INPUT(%s)\n", cir.inputs[i]);
     }
 
-    printf("\n*** outputs ***\n");
-    printf("output count: %d\n", cir.output_cnt);
+    printf("\n");
 
     for (int i = 0; i < cir.output_cnt; i++)
     {
-        printf("output %d: %s;\n", i, cir.outputs[i]);
+        printf("OUTPUT(%s)\n", cir.outputs[i]);
     }
 
-    printf("\n*** gates ***\n");
-    printf("gate count: %d\n", cir.gate_cnt);
+    printf("\n");
 
     for (int i = 0; i < cir.gate_cnt; i++)
     {
-        printf("gate type: %d\n", cir.gates[i].type);
-        printf("gate input count: %d\n", cir.gates[i].input_cnt);
+        printf("%s = ", cir.gates[i].output);
+        printf("%d(", cir.gates[i].type);
 
-        for (int j = 0; j < cir.gates[i].input_cnt; j++)
+        for (int j = 0; j < cir.gates[i].input_cnt - 1; j++)
         {
-            printf("gate input %d: %s;\n", j, cir.gates[i].inputs[j]);
+            printf("%s, ", cir.gates[i].inputs[j]);
         }
 
-        printf("gate output: %s;\n\n", cir.gates[i].output);
+        printf("%s)\n", cir.gates[i].inputs[cir.gates[i].input_cnt - 1]);
     }
 }
 
-static void parse_bench(const char * file_name, struct circuit * cir)
+static circuit_t * parse_bench(const char * file_name, const char * prefix)
 {
     FILE * fptr;
     char line[256];
+    circuit_t * cir;
 
     fptr = fopen(file_name, "r");
 
@@ -110,6 +109,7 @@ static void parse_bench(const char * file_name, struct circuit * cir)
     }
 
     // initialize circuit
+    cir = malloc(sizeof(circuit_t));
     cir->input_cnt = 0;
     cir->output_cnt = 0;
     cir->gate_cnt = 0;
@@ -138,23 +138,28 @@ static void parse_bench(const char * file_name, struct circuit * cir)
         else if (strncmp(line, "OUTPUT", 6) == 0)
         {
             char * output;
+            char name[MAX_NAME];
 
             output = strtok(line, "(");
             output = strtok(NULL, ")");
 
-            strcpy(cir->outputs[cir->output_cnt], output);
+            snprintf(name, sizeof(name), "%s_%s", prefix, output);
+            strcpy(cir->outputs[cir->output_cnt], name);
             cir->output_cnt++;
         }
         else
         {
             // format: output_pin = GATE(input1, input2, ...)
 
-            struct gate * gate = &cir->gates[cir->gate_cnt];
+            gate_t * gate = &cir->gates[cir->gate_cnt];
             char * token;
+            char name[MAX_NAME];
 
             // get gate output pin
             token = strtok(line, " =");
-            strcpy(gate->output, token);
+
+            snprintf(name, sizeof(name), "%s_%s", prefix, token);
+            strcpy(gate->output, name);
 
             // get gate type
 
@@ -195,7 +200,29 @@ static void parse_bench(const char * file_name, struct circuit * cir)
 
             do
             {
-                strcpy(gate->inputs[gate->input_cnt], token);
+                int is_primary_input = 0;
+
+                // check if primary input
+                for (int i = 0; i < cir->input_cnt; i++)
+                {
+                    if (strcmp(cir->inputs[i], token) == 0)
+                    {
+                        is_primary_input = 1;
+                        break;
+                    }
+                }
+
+                if (is_primary_input == 0)
+                {
+                    char in_name[MAX_NAME];
+                    snprintf(in_name, sizeof(in_name), "%s_%s", prefix, token);
+                    strcpy(gate->inputs[gate->input_cnt], in_name);
+                }
+                else
+                {
+                    strcpy(gate->inputs[gate->input_cnt], token);
+                }
+
                 gate->input_cnt++;
                 token = strtok(NULL, ", )");
             }
@@ -207,4 +234,6 @@ static void parse_bench(const char * file_name, struct circuit * cir)
     }
 
     fclose(fptr);
+
+    return cir;
 }
