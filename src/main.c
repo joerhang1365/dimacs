@@ -69,6 +69,7 @@ void print_circuit(const circuit_t * cir)
     printf("gate count: %d\n", cir->gate_cnt);
     printf("\n");
 
+    // print inputs
     for (int i = 0; i < cir->input_cnt; i++)
     {
         printf("INPUT(%s)\n", cir->inputs[i]);
@@ -76,6 +77,7 @@ void print_circuit(const circuit_t * cir)
 
     printf("\n");
 
+    // print outputs
     for (int i = 0; i < cir->output_cnt; i++)
     {
         printf("OUTPUT(%s)\n", cir->outputs[i]);
@@ -83,6 +85,7 @@ void print_circuit(const circuit_t * cir)
 
     printf("\n");
 
+    // print gates
     for (int i = 0; i < cir->gate_cnt; i++)
     {
         printf("%s = ", cir->gates[i].output);
@@ -99,9 +102,11 @@ void print_circuit(const circuit_t * cir)
 
 circuit_t * parse_bench(const char * file_name)
 {
+    circuit_t * cir;
     FILE * fptr;
     char line[256];
-    circuit_t * cir;
+    char * token;
+    size_t len;
 
     fptr = fopen(file_name, "r");
 
@@ -111,42 +116,45 @@ circuit_t * parse_bench(const char * file_name)
         return NULL;
     }
 
-    // initialize circuit
+    // initialize circuit;
     cir = calloc(1, sizeof(circuit_t));
+    if (cir == NULL)
+    {
+        printf("ERROR: circuit memory allocation failed\n");
+        return NULL;
+    }
 
     while(fgets(line, sizeof(line), fptr) != NULL)
     {
+        len = strlen(line);
+
         // remove newline
-        size_t len = strlen(line);
         if (len > 0 && line[len - 1] == '\n')
         {
             line[len - 1] = '\0';
+            len--;
         }
 
         // skip empty lines and comments
-        if (strlen(line) == 0 || line[0] == '#')
+        if (len == 0 || line[0] == '#')
         {
             continue;
         }
 
         if (strncmp(line, "INPUT", 5) == 0)
         {
-            char * input;
+            token = strtok(line, "(");
+            token = strtok(NULL, ")");
 
-            input = strtok(line, "(");
-            input = strtok(NULL, ")");
-
-            strcpy(cir->inputs[cir->input_cnt], input);
+            strcpy(cir->inputs[cir->input_cnt], token);
             cir->input_cnt++;
         }
         else if (strncmp(line, "OUTPUT", 6) == 0)
         {
-            char * output;
+            token = strtok(line, "(");
+            token = strtok(NULL, ")");
 
-            output = strtok(line, "(");
-            output = strtok(NULL, ")");
-
-            strcpy(cir->outputs[cir->output_cnt], output);
+            strcpy(cir->outputs[cir->output_cnt], token);
             cir->output_cnt++;
         }
         else
@@ -154,8 +162,6 @@ circuit_t * parse_bench(const char * file_name)
             // format: output_pin = GATE(input1, input2, ...)
 
             gate_t * gate = &cir->gates[cir->gate_cnt];
-            char * token;
-
             gate->input_cnt = 0;
 
             // get gate output pin
@@ -230,23 +236,21 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     }
 
     // initialze miter
-    circuit_t * m = calloc(1, sizeof(circuit_t));
+    circuit_t * m;
+    m = calloc(1, sizeof(circuit_t));
 
     // copy primary inputs
     m->input_cnt = a->input_cnt;
     memcpy(m->inputs, a->inputs, sizeof(a->inputs));
 
-    // copy gates from a with prefix "a_"
+    // copy gates from circuit_a with prefix "a_"
     for (int i = 0; i < a->gate_cnt; i++)
     {
         gate_t * g = &m->gates[m->gate_cnt];
-        *g = a->gates[i];
+        *g = a->gates[i]; // copy struct
 
         // rename gate output
-        char output_name[MAX_NAME];
-
-        snprintf(output_name, sizeof(output_name), "a_%s", a->gates[i].output);
-        strcpy(g->output, output_name);
+        snprintf(g->output, MAX_NAME, "a_%s", a->gates[i].output);
 
         // rename gate inputs if they are not primary inputs
         for (int j = 0; j < g->input_cnt; j++)
@@ -264,9 +268,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
             if (is_primary == 0)
             {
-                char input_name[MAX_NAME];
-                snprintf(input_name, sizeof(input_name), "a_%s", a->gates[i].inputs[j]);
-                strcpy(g->inputs[j], input_name);
+                snprintf(g->inputs[j], MAX_NAME, "a_%s", a->gates[i].inputs[j]);
             }
             else
             {
@@ -284,10 +286,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
         *g = b->gates[i];
 
         // rename gate output
-        char output_name[MAX_NAME];
-
-        snprintf(output_name, sizeof(output_name), "b_%s", b->gates[i].output);
-        strcpy(g->output, output_name);
+        snprintf(g->output, MAX_NAME, "b_%s", b->gates[i].output);
 
         // rename gate inputs if they are not primary inputs
         for (int j = 0; j < g->input_cnt; j++)
@@ -305,9 +304,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
             if (is_primary == 0)
             {
-                char input_name[MAX_NAME];
-                snprintf(input_name, sizeof(input_name), "b_%s", b->gates[i].inputs[j]);
-                strcpy(g->inputs[j], input_name);
+                snprintf(g->inputs[j], MAX_NAME, "b_%s", b->gates[i].inputs[j]);
             }
             else
             {

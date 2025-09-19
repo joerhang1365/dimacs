@@ -2,6 +2,7 @@ CC=$(PREFIX)gcc
 
 CFLAGS = -Wall -Werror=implicit-function-declaration
 CFLAGS += -I.
+CFLAGS += -g -DDEBUG
 
 TARGET=bin/ec
 
