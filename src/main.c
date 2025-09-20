@@ -448,6 +448,9 @@ int get_id(const char * name)
 // I am pretty sure I can use a tree to build all of the clauses
 // but dont know how to do that yet and need to pass this class
 // can make a better later
+// TODO: store clauses in a struct so that I can properly count how
+// many there are. Then I need to add the last output or something as
+// a final clauses
 int tseytin_transform(circuit_t * const cir, const char * file_name)
 {
     FILE * dimacs_fptr = fopen(file_name, "w");
@@ -473,6 +476,12 @@ int tseytin_transform(circuit_t * const cir, const char * file_name)
     for (int i = 0; i < cir->input_cnt; i++)
     {
         new_id(cir->inputs[i]);
+    }
+
+    // assign a unique ID to every gate output
+    for (int i = 0; i < cir->gate_cnt; i++)
+    {
+        new_id(cir->gates[i].output);
     }
 
     // get the cnf form of every gate in the circuit
@@ -532,41 +541,13 @@ int tseytin_transform(circuit_t * const cir, const char * file_name)
         else if (cir->gates[i].type == XOR)
         {
             int output_id = get_id(cir->gates[i].output);
+            int input1_id = get_id(cir->gates[i].inputs[0]);
+            int input2_id = get_id(cir->gates[i].inputs[1]);
 
-            for (int j = 0; j < cir->gates[i].input_cnt; j++)
-            {
-                if (j == cir->gates[i].input_cnt)
-                {
-                    fprintf(dimacs_fptr, "-%d ", output_id);
-                }
-
-                for (int k = 0; k < cir->gates[i].input_cnt; k++)
-                {
-                    int input_id = get_id(cir->gates[i].inputs[k]);
-
-                    // need to make one thing neg and shuffle down idk
-                    if (k == j)
-                    {
-                        fprintf(dimacs_fptr, "-%d ", input_id);
-                    }
-                    else
-                    {
-                        fprintf(dimacs_fptr, "%d ", input_id);
-                    }
-                }
-
-                fprintf(dimacs_fptr, "0\n");
-            }
-
-            fprintf(dimacs_fptr, "-%d ", output_id);
-
-            for (int j = 0; j < cir->gates[i].input_cnt; j++)
-            {
-                int input_id = get_id(cir->gates[i].inputs[j]);
-                fprintf(dimacs_fptr, "-%d ", input_id);
-            }
-
-            fprintf(dimacs_fptr, "0\n");
+            fprintf(dimacs_fptr, "%d %d -%d 0\n", input1_id, input2_id, output_id);
+            fprintf(dimacs_fptr, "%d -%d %d 0\n", input1_id, input2_id, output_id);
+            fprintf(dimacs_fptr, "-%d %d %d 0\n", input1_id, input2_id, output_id);
+            fprintf(dimacs_fptr, "-%d -%d -%d 0\n", input1_id, input2_id, output_id);
         }
     }
 
