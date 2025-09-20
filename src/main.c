@@ -19,10 +19,10 @@
 #define MAX_GATES 2048
 #define MAX_NAME 128
 
-enum GATE_TYPE { AND, NAND, OR, NOR, NOT, XOR, BUFF, UNKNOWN };
+enum gate_type { AND, NAND, OR, NOR, NOT, XOR, BUFF, UNKNOWN };
 
 typedef struct {
-    enum GATE_TYPE type;
+    enum gate_type type;
     int input_cnt;
     char inputs[MAX_GATE_INPUTS][MAX_NAME];
     char output[MAX_NAME];
@@ -39,6 +39,7 @@ typedef struct {
 
 static circuit_t * parse_bench(const char * file_name);
 static circuit_t * miter_struct(circuit_t * a, circuit_t * b);
+static char * gate_name(enum gate_type type);
 static void print_circuit(const circuit_t  * cir);
 //static struct circuit miter(struct circuit cir_a, struct circuit cir_b);
 //static int tseitin_transform(struct circuit cir);
@@ -60,6 +61,30 @@ int main(int argc, char ** args)
 
     return 0;
 }
+
+char * gate_name(enum gate_type type)
+{
+    static char * const names[] =
+    {
+        [AND] = "AND",
+        [NAND] = "NAND",
+        [OR] = "OR",
+        [NOR] = "NOR",
+        [NOT] = "NOT",
+        [XOR] = "XOR",
+        [BUFF] = "BUFF",
+        [UNKNOWN] = "UNKNOWN"
+    };
+
+    if ((int)type >= 0 && (int)type < sizeof(names) / sizeof(names[0]))
+    {
+        return names[type];
+    }
+    else
+    {
+        return "UNDEFINED";
+    }
+};
 
 void print_circuit(const circuit_t * cir)
 {
@@ -89,7 +114,7 @@ void print_circuit(const circuit_t * cir)
     for (int i = 0; i < cir->gate_cnt; i++)
     {
         printf("%s = ", cir->gates[i].output);
-        printf("%d(", cir->gates[i].type);
+        printf("%s(", gate_name(cir->gates[i].type));
 
         for (int j = 0; j < cir->gates[i].input_cnt - 1; j++)
         {
@@ -102,13 +127,7 @@ void print_circuit(const circuit_t * cir)
 
 circuit_t * parse_bench(const char * file_name)
 {
-    circuit_t * cir;
-    FILE * fptr;
-    char line[256];
-    char * token;
-    size_t len;
-
-    fptr = fopen(file_name, "r");
+    FILE * fptr = fopen(file_name, "r");
 
     if (fptr == NULL)
     {
@@ -117,16 +136,18 @@ circuit_t * parse_bench(const char * file_name)
     }
 
     // initialize circuit;
-    cir = calloc(1, sizeof(circuit_t));
+    circuit_t * cir = calloc(1, sizeof(circuit_t));
     if (cir == NULL)
     {
         printf("ERROR: circuit memory allocation failed\n");
         return NULL;
     }
 
+    char line[256];
+
     while(fgets(line, sizeof(line), fptr) != NULL)
     {
-        len = strlen(line);
+        size_t len = strlen(line);
 
         // remove newline
         if (len > 0 && line[len - 1] == '\n')
@@ -143,18 +164,40 @@ circuit_t * parse_bench(const char * file_name)
 
         if (strncmp(line, "INPUT", 5) == 0)
         {
-            token = strtok(line, "(");
+            char * token = strtok(line, "(");
+
+            if (token == NULL)
+            {
+                continue;
+            }
+
             token = strtok(NULL, ")");
 
-            strcpy(cir->inputs[cir->input_cnt], token);
+            if (token == NULL)
+            {
+                continue;
+            }
+
+            strncpy(cir->inputs[cir->input_cnt], token, MAX_NAME - 1);
             cir->input_cnt++;
         }
         else if (strncmp(line, "OUTPUT", 6) == 0)
         {
-            token = strtok(line, "(");
+            char * token = strtok(line, "(");
+
+            if (token == NULL)
+            {
+                continue;
+            }
+
             token = strtok(NULL, ")");
 
-            strcpy(cir->outputs[cir->output_cnt], token);
+            if (token == NULL)
+            {
+                continue;
+            }
+
+            strncpy(cir->outputs[cir->output_cnt], token, MAX_NAME - 1);
             cir->output_cnt++;
         }
         else
@@ -162,15 +205,25 @@ circuit_t * parse_bench(const char * file_name)
             // format: output_pin = GATE(input1, input2, ...)
 
             gate_t * gate = &cir->gates[cir->gate_cnt];
-            gate->input_cnt = 0;
 
             // get gate output pin
-            token = strtok(line, " =");
-            strcpy(gate->output, token);
+            char * token = strtok(line, " =");
+
+            if (token == NULL)
+            {
+                continue;
+            }
+
+            strncpy(gate->output, token, MAX_NAME - 1);
 
             // get gate type
 
             token = strtok(NULL, "= (");
+
+            if (token == NULL)
+            {
+                continue;
+            }
 
             if (strncmp(token, "AND", 3) == 0)
             {
@@ -200,6 +253,10 @@ circuit_t * parse_bench(const char * file_name)
             {
                 gate->type = BUFF;
             }
+            else
+            {
+                gate->type = UNKNOWN;
+            }
 
             // get gate inputs
 
@@ -207,7 +264,7 @@ circuit_t * parse_bench(const char * file_name)
 
             while (token != NULL)
             {
-                strcpy(gate->inputs[gate->input_cnt], token);
+                strncpy(gate->inputs[gate->input_cnt], token, MAX_NAME - 1);
                 gate->input_cnt++;
                 token = strtok(NULL, ", )");
             }
@@ -236,8 +293,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     }
 
     // initialze miter
-    circuit_t * m;
-    m = calloc(1, sizeof(circuit_t));
+    circuit_t * m = calloc(1, sizeof(circuit_t));
 
     // copy primary inputs
     m->input_cnt = a->input_cnt;
@@ -250,7 +306,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
         *g = a->gates[i]; // copy struct
 
         // rename gate output
-        snprintf(g->output, MAX_NAME, "a_%s", a->gates[i].output);
+        sprintf(g->output, "a_%s", a->gates[i].output);
 
         // rename gate inputs if they are not primary inputs
         for (int j = 0; j < g->input_cnt; j++)
@@ -268,7 +324,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
             if (is_primary == 0)
             {
-                snprintf(g->inputs[j], MAX_NAME, "a_%s", a->gates[i].inputs[j]);
+                sprintf(g->inputs[j], "a_%s", a->gates[i].inputs[j]);
             }
             else
             {
@@ -286,7 +342,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
         *g = b->gates[i];
 
         // rename gate output
-        snprintf(g->output, MAX_NAME, "b_%s", b->gates[i].output);
+        sprintf(g->output, "b_%s", b->gates[i].output);
 
         // rename gate inputs if they are not primary inputs
         for (int j = 0; j < g->input_cnt; j++)
@@ -304,7 +360,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
             if (is_primary == 0)
             {
-                snprintf(g->inputs[j], MAX_NAME, "b_%s", b->gates[i].inputs[j]);
+                sprintf(g->inputs[j], "b_%s", b->gates[i].inputs[j]);
             }
             else
             {
@@ -324,9 +380,9 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
         xor_gate->type = XOR;
         xor_gate->input_cnt = 2;
 
-        snprintf(xor_gate->inputs[0], MAX_NAME, "a_%s", a->outputs[i]);
-        snprintf(xor_gate->inputs[1], MAX_NAME, "b_%s", b->outputs[i]);
-        snprintf(xor_gate->output, MAX_NAME, "xor_out_%d", i);
+        sprintf(xor_gate->inputs[0], "a_%s", a->outputs[i]);
+        sprintf(xor_gate->inputs[1], "b_%s", b->outputs[i]);
+        sprintf(xor_gate->output, "xor_out_%d", i);
 
         m->gate_cnt++;
     }
@@ -339,10 +395,10 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
     for (int i = 0; i < a->output_cnt; i++)
     {
-        snprintf(or_gate->inputs[i], MAX_NAME, "xor_out_%d", i);
+        sprintf(or_gate->inputs[i], "xor_out_%d", i);
     }
 
-    snprintf(or_gate->output, MAX_NAME, "miter_out");
+    strcpy(or_gate->output, "miter_out");
     m->gate_cnt++;
     strcpy(m->outputs[0], "miter_out");
     m->output_cnt = 1;
