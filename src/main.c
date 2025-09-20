@@ -37,12 +37,22 @@ typedef struct {
     gate_t gates[MAX_GATES];
 } circuit_t;
 
-static circuit_t * parse_bench(const char * file_name);
-static circuit_t * miter_struct(circuit_t * a, circuit_t * b);
+typedef struct {
+    char name[MAX_NAME];
+    int id;
+} map_t;
+
 static char * gate_name(enum gate_type type);
 static void print_circuit(const circuit_t  * cir);
-//static struct circuit miter(struct circuit cir_a, struct circuit cir_b);
-//static int tseitin_transform(struct circuit cir);
+static circuit_t * parse_bench(const char * file_name);
+static circuit_t * miter_struct(circuit_t * const a, circuit_t * const b);
+
+static int new_id(const char * name);
+static int get_id(const char * name);
+static int tseytin_transform(circuit_t * const cir, const char * file_name);
+
+static map_t * map = NULL;
+static int id_cnt = 0;
 
 int main(int argc, char ** args)
 {
@@ -55,9 +65,12 @@ int main(int argc, char ** args)
     circuit_t * a = parse_bench(args[1]);
     circuit_t * b = parse_bench(args[2]);
     circuit_t * miter = miter_struct(a, b);
+
     print_circuit(a);
     print_circuit(b);
     print_circuit(miter);
+
+    tseytin_transform(miter, args[3]);
 
     return 0;
 }
@@ -404,4 +417,160 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     m->output_cnt = 1;
 
     return m;
+}
+
+int new_id(const char * name)
+{
+    map = realloc(map, (id_cnt) + 1 * sizeof(map_t));
+    strcpy(map[id_cnt].name, name);
+    map[id_cnt].id = id_cnt + 1;
+    id_cnt++;
+    return id_cnt;
+}
+
+int get_id(const char * name)
+{
+    // check if id exists
+    for (int i = 0; i < id_cnt; i++)
+    {
+        if (strcmp(map[i].name, name) == 0)
+        {
+            return map[i].id;
+        }
+    }
+
+    // make a new id
+    return new_id(name);
+}
+
+// This solution is a little scuffed as I am manually programming all the
+// transfermations
+// I am pretty sure I can use a tree to build all of the clauses
+// but dont know how to do that yet and need to pass this class
+// can make a better later
+int tseytin_transform(circuit_t * const cir, const char * file_name)
+{
+    FILE * dimacs_fptr = fopen(file_name, "w");
+
+    if (dimacs_fptr == NULL)
+    {
+        printf("ERROR: could not open .dimacs file\n");
+        return 1;
+    }
+
+    // formal file header
+    int var_cnt = cir->input_cnt  + cir->gate_cnt;
+    int clause_cnt = 0;
+
+    for (int i = 0; i < cir->gate_cnt; i++)
+    {
+        clause_cnt += cir->gates[i].input_cnt + 1;
+    }
+
+    fprintf(dimacs_fptr, "p cnf %d %d\n", var_cnt, clause_cnt);
+
+    // assign a unique ID to every input
+    for (int i = 0; i < cir->input_cnt; i++)
+    {
+        new_id(cir->inputs[i]);
+    }
+
+    // get the cnf form of every gate in the circuit
+    for (int i = 0; i < cir->gate_cnt; i++)
+    {
+        // generate AND CNF
+        // format: (a | ~c) & (b | ~c) & (~a | ~b | c)
+        //         a -c 0
+        //         b -c 0
+        //         c -a -b 0
+        if (cir->gates[i].type == AND)
+        {
+            int output_id = get_id(cir->gates[i].output);
+
+            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            {
+                int input_id = get_id(cir->gates[i].inputs[j]);
+                fprintf(dimacs_fptr, "%d -%d 0\n", input_id, output_id);
+            }
+
+            fprintf(dimacs_fptr, "%d ", output_id);
+
+            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            {
+                int input_id = get_id(cir->gates[i].inputs[j]);
+                fprintf(dimacs_fptr, "-%d ", input_id);
+            }
+
+            fprintf(dimacs_fptr, "0\n");
+        }
+        // generate OR CNF
+        // format: (~a | c) & (~b | c) & (a | b | ~c)
+        //         -a c 0
+        //         -b c 0
+        //         -c a b 0
+        else if (cir->gates[i].type == OR)
+        {
+            int output_id = get_id(cir->gates[i].output);
+
+            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            {
+                int input_id = get_id(cir->gates[i].inputs[j]);
+                fprintf(dimacs_fptr, "-%d %d 0\n", input_id, output_id);
+            }
+
+            fprintf(dimacs_fptr, "-%d ", output_id);
+
+            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            {
+                int input_id = get_id(cir->gates[i].inputs[j]);
+                fprintf(dimacs_fptr, "%d ", input_id);
+            }
+
+            fprintf(dimacs_fptr, "0\n");
+        }
+        // genreate XOR
+        else if (cir->gates[i].type == XOR)
+        {
+            int output_id = get_id(cir->gates[i].output);
+
+            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            {
+                if (j == cir->gates[i].input_cnt)
+                {
+                    fprintf(dimacs_fptr, "-%d ", output_id);
+                }
+
+                for (int k = 0; k < cir->gates[i].input_cnt; k++)
+                {
+                    int input_id = get_id(cir->gates[i].inputs[k]);
+
+                    // need to make one thing neg and shuffle down idk
+                    if (k == j)
+                    {
+                        fprintf(dimacs_fptr, "-%d ", input_id);
+                    }
+                    else
+                    {
+                        fprintf(dimacs_fptr, "%d ", input_id);
+                    }
+                }
+
+                fprintf(dimacs_fptr, "0\n");
+            }
+
+            fprintf(dimacs_fptr, "-%d ", output_id);
+
+            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            {
+                int input_id = get_id(cir->gates[i].inputs[j]);
+                fprintf(dimacs_fptr, "-%d ", input_id);
+            }
+
+            fprintf(dimacs_fptr, "0\n");
+        }
+    }
+
+    fclose(dimacs_fptr);
+
+    return 0;
 }
