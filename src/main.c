@@ -13,44 +13,44 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_INPUTS 64
-#define MAX_OUTPUTS 64
-#define MAX_GATE_INPUTS 64
-#define MAX_GATES 2048
-#define MAX_NAME 128
+#define MAX_NAME_LEN 16
+#define MAX_INPUTS 512
+#define MAX_OUTPUTS 512
+#define MAX_GATE_INPUTS 128
+#define MAX_GATES 4096
 
 enum gate_type { AND, NAND, OR, NOR, NOT, XOR, BUFF, UNKNOWN };
 
-typedef struct {
-    enum gate_type type;
+struct gate {
+    char inputs[MAX_GATE_INPUTS][MAX_NAME_LEN];
+    char output[MAX_NAME_LEN];
     int input_cnt;
-    char inputs[MAX_GATE_INPUTS][MAX_NAME];
-    char output[MAX_NAME];
-} gate_t;
+    enum gate_type type;
+};
 
-typedef struct {
+struct logic_gates {
+    char inputs[MAX_INPUTS][MAX_NAME_LEN];
+    char outputs[MAX_OUTPUTS][MAX_NAME_LEN];
+    struct gate gates[MAX_GATES];
     int input_cnt;
     int output_cnt;
     int gate_cnt;
-    char inputs[MAX_INPUTS][MAX_NAME];
-    char outputs[MAX_OUTPUTS][MAX_NAME];
-    gate_t gates[MAX_GATES];
-} circuit_t;
+};
 
 typedef struct {
-    char name[MAX_NAME];
+    char name[MAX_NAME_LEN];
     int id;
 } map_t;
 
 static char * gate_name(enum gate_type type);
-static void print_circuit(const circuit_t  * cir);
-static circuit_t * parse_bench(const char * file_name);
-static circuit_t * miter_struct(circuit_t * const a, circuit_t * const b);
+static void print_bench(struct logic_gates * lg);
+static struct logic_gates * parse_bench(const char * file_name);
+static struct logic_gates * miter_struct(struct logic_gates * a, struct logic_gates * b);
 
 static int new_id(const char * name);
 static int get_id(const char * name);
 static void print_map();
-static int tseytin_transform(circuit_t * const cir, const char * file_name);
+static int tseytin_transform(struct logic_gates * lg, const char * file_name);
 
 static map_t * map = NULL;
 static int id_cnt = 0;
@@ -63,13 +63,13 @@ int main(int argc, char ** args)
         return 1;
     }
 
-    circuit_t * a = parse_bench(args[1]);
-    circuit_t * b = parse_bench(args[2]);
-    circuit_t * miter = miter_struct(a, b);
+    struct logic_gates * a = parse_bench(args[1]);
+    struct logic_gates * b = parse_bench(args[2]);
+    struct logic_gates * miter = miter_struct(a, b);
 
-    print_circuit(a);
-    print_circuit(b);
-    print_circuit(miter);
+    print_bench(a);
+    print_bench(b);
+    print_bench(miter);
 
     tseytin_transform(miter, args[3]);
 
@@ -100,46 +100,46 @@ char * gate_name(enum gate_type type)
     }
 };
 
-void print_circuit(const circuit_t * cir)
+void print_bench(struct logic_gates * lg)
 {
-    printf("\n*** circuit ***\n");
-    printf("input count: %d\n", cir->input_cnt);
-    printf("output count: %d\n", cir->output_cnt);
-    printf("gate count: %d\n", cir->gate_cnt);
+    printf("\n*** logic circuit ***\n");
+    printf("input count: %d\n", lg->input_cnt);
+    printf("output count: %d\n", lg->output_cnt);
+    printf("gate count: %d\n", lg->gate_cnt);
     printf("\n");
 
     // print inputs
-    for (int i = 0; i < cir->input_cnt; i++)
+    for (int i = 0; i < lg->input_cnt; i++)
     {
-        printf("INPUT(%s)\n", cir->inputs[i]);
+        printf("INPUT(%s)\n", lg->inputs[i]);
     }
 
     printf("\n");
 
     // print outputs
-    for (int i = 0; i < cir->output_cnt; i++)
+    for (int i = 0; i < lg->output_cnt; i++)
     {
-        printf("OUTPUT(%s)\n", cir->outputs[i]);
+        printf("OUTPUT(%s)\n", lg->outputs[i]);
     }
 
     printf("\n");
 
     // print gates
-    for (int i = 0; i < cir->gate_cnt; i++)
+    for (int i = 0; i < lg->gate_cnt; i++)
     {
-        printf("%s = ", cir->gates[i].output);
-        printf("%s(", gate_name(cir->gates[i].type));
+        printf("%s = ", lg->gates[i].output);
+        printf("%s(", gate_name(lg->gates[i].type));
 
-        for (int j = 0; j < cir->gates[i].input_cnt - 1; j++)
+        for (int j = 0; j < lg->gates[i].input_cnt - 1; j++)
         {
-            printf("%s, ", cir->gates[i].inputs[j]);
+            printf("%s, ", lg->gates[i].inputs[j]);
         }
 
-        printf("%s)\n", cir->gates[i].inputs[cir->gates[i].input_cnt - 1]);
+        printf("%s)\n", lg->gates[i].inputs[lg->gates[i].input_cnt - 1]);
     }
 }
 
-circuit_t * parse_bench(const char * file_name)
+struct logic_gates * parse_bench(const char * file_name)
 {
     FILE * fptr = fopen(file_name, "r");
 
@@ -150,7 +150,7 @@ circuit_t * parse_bench(const char * file_name)
     }
 
     // initialize circuit;
-    circuit_t * cir = malloc(sizeof(circuit_t));
+    struct logic_gates * cir = malloc(sizeof(struct logic_gates));
     cir->input_cnt = 0;
     cir->output_cnt = 0;
     cir->gate_cnt = 0;
@@ -196,7 +196,7 @@ circuit_t * parse_bench(const char * file_name)
                 continue;
             }
 
-            strncpy(cir->inputs[cir->input_cnt], token, MAX_NAME - 1);
+            strcpy(cir->inputs[cir->input_cnt], token);
             cir->input_cnt++;
         }
         else if (strncmp(line, "OUTPUT", 6) == 0)
@@ -215,14 +215,14 @@ circuit_t * parse_bench(const char * file_name)
                 continue;
             }
 
-            strncpy(cir->outputs[cir->output_cnt], token, MAX_NAME - 1);
+            strcpy(cir->outputs[cir->output_cnt], token);
             cir->output_cnt++;
         }
         else
         {
             // format: output_pin = GATE(input1, input2, ...)
 
-            gate_t gate;
+            struct gate gate;
             gate.input_cnt = 0;
 
             // get gate output pin
@@ -234,7 +234,7 @@ circuit_t * parse_bench(const char * file_name)
                 continue;
             }
 
-            strncpy(gate.output, token, MAX_NAME - 1);
+            strcpy(gate.output, token);
 
             // get gate type
 
@@ -285,7 +285,7 @@ circuit_t * parse_bench(const char * file_name)
 
             while (token != NULL)
             {
-                strncpy(gate.inputs[gate.input_cnt], token, MAX_NAME - 1);
+                strcpy(gate.inputs[gate.input_cnt], token);
                 gate.input_cnt++;
                 token = strtok(NULL, ", )");
             }
@@ -308,7 +308,7 @@ circuit_t * parse_bench(const char * file_name)
 }
 
 // shares primary inputs from circuits a and b
-circuit_t * miter_struct(circuit_t * a, circuit_t * b)
+struct logic_gates * miter_struct(struct logic_gates * a, struct logic_gates * b)
 {
     if (a->input_cnt != b->input_cnt)
     {
@@ -321,7 +321,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     }
 
     // initialze miter
-    circuit_t * m = malloc(sizeof(circuit_t));
+    struct logic_gates * m = malloc(sizeof(struct logic_gates));
     m->input_cnt = 0;
     m->output_cnt = 0;
     m->gate_cnt = 0;
@@ -338,7 +338,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     for (int i = 0; i < a->gate_cnt; i++)
     {
         // copy gate
-        gate_t g = a->gates[i];
+        struct gate g = a->gates[i];
 
         // rename gate output
         sprintf(g.output, "a_%s", a->gates[i].output);
@@ -372,7 +372,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     for (int i = 0; i < b->gate_cnt; i++)
     {
         // copy gate
-        gate_t g = b->gates[i];
+        struct gate g = b->gates[i];
 
         // rename gate output
         sprintf(g.output, "b_%s", b->gates[i].output);
@@ -407,7 +407,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     // name and use that index
     for (int i = 0; i < a->output_cnt; i++)
     {
-        gate_t xor_gate;
+        struct gate xor_gate;
         xor_gate.type = XOR;
         xor_gate.input_cnt = 2;
 
@@ -421,7 +421,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
     // connect all of the XOR gates to a single OR gate
 
-    gate_t or_gate;
+    struct gate or_gate;
     or_gate.type = OR;
     or_gate.input_cnt = a->output_cnt;
 
@@ -485,7 +485,7 @@ void print_map()
 // AND: C = A & B ; (~A | ~B | C) & (A | ~C) & (B | ~C)
 // OR : C = A | B ; (A | B | ~C) & (~A | C) & (~B | C)
 
-int tseytin_transform(circuit_t * const cir, const char * file_name)
+int tseytin_transform(struct logic_gates * const cir, const char * file_name)
 {
     FILE * dimacs_fptr = fopen(file_name, "w");
 
