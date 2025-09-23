@@ -2,7 +2,7 @@ CC=$(PREFIX)gcc
 
 CFLAGS = -Wall -Werror=implicit-function-declaration
 CFLAGS += -I.
-CFLAGS += -g -DDEBUG
+CFLAGS += -g -o -DDEBUG
 
 TARGET=bin/ec
 
@@ -12,7 +12,7 @@ $(TARGET): src/main.c
 	$(CC) $(CFLAGS) -o $@ $<
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) *.dimacs
 
 .PHONY: build clean
 

@@ -49,6 +49,7 @@ static circuit_t * miter_struct(circuit_t * const a, circuit_t * const b);
 
 static int new_id(const char * name);
 static int get_id(const char * name);
+static void print_map();
 static int tseytin_transform(circuit_t * const cir, const char * file_name);
 
 static map_t * map = NULL;
@@ -149,7 +150,11 @@ circuit_t * parse_bench(const char * file_name)
     }
 
     // initialize circuit;
-    circuit_t * cir = calloc(1, sizeof(circuit_t));
+    circuit_t * cir = malloc(sizeof(circuit_t));
+    cir->input_cnt = 0;
+    cir->output_cnt = 0;
+    cir->gate_cnt = 0;
+
     if (cir == NULL)
     {
         printf("ERROR: circuit memory allocation failed\n");
@@ -217,17 +222,19 @@ circuit_t * parse_bench(const char * file_name)
         {
             // format: output_pin = GATE(input1, input2, ...)
 
-            gate_t * gate = &cir->gates[cir->gate_cnt];
+            gate_t gate;
+            gate.input_cnt = 0;
 
             // get gate output pin
             char * token = strtok(line, " =");
 
             if (token == NULL)
             {
+                printf("ERROR: could not find gate output\n");
                 continue;
             }
 
-            strncpy(gate->output, token, MAX_NAME - 1);
+            strncpy(gate.output, token, MAX_NAME - 1);
 
             // get gate type
 
@@ -235,40 +242,41 @@ circuit_t * parse_bench(const char * file_name)
 
             if (token == NULL)
             {
+                printf("ERROR: could not find gate type\n");
                 continue;
             }
 
             if (strncmp(token, "AND", 3) == 0)
             {
-                gate->type = AND;
+                gate.type = AND;
             }
             else if (strncmp(token, "NAND", 4) == 0)
             {
-                gate->type = NAND;
+                gate.type = NAND;
             }
             else if (strncmp(token, "OR", 2) == 0)
             {
-                gate->type = OR;
+                gate.type = OR;
             }
             else if (strncmp(token, "NOR", 3) == 0)
             {
-                gate->type = NOR;
+                gate.type = NOR;
             }
             else if (strncmp(token, "NOT", 3) == 0)
             {
-                gate->type = NOT;
+                gate.type = NOT;
             }
             else if (strncmp(token, "XOR", 3) == 0)
             {
-                gate->type = XOR;
+                gate.type = XOR;
             }
             else if (strncmp(token, "BUFF", 3) == 0)
             {
-                gate->type = BUFF;
+                gate.type = BUFF;
             }
             else
             {
-                gate->type = UNKNOWN;
+                gate.type = UNKNOWN;
             }
 
             // get gate inputs
@@ -277,12 +285,19 @@ circuit_t * parse_bench(const char * file_name)
 
             while (token != NULL)
             {
-                strncpy(gate->inputs[gate->input_cnt], token, MAX_NAME - 1);
-                gate->input_cnt++;
+                strncpy(gate.inputs[gate.input_cnt], token, MAX_NAME - 1);
+                gate.input_cnt++;
                 token = strtok(NULL, ", )");
             }
 
+            if (gate.input_cnt == 0)
+            {
+                printf("ERROR: could not find inputs for gate\n");
+                continue;
+            }
+
             // add gate to circuit
+            cir->gates[cir->gate_cnt] = gate;
             cir->gate_cnt++;
         }
     }
@@ -306,29 +321,37 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
     }
 
     // initialze miter
-    circuit_t * m = calloc(1, sizeof(circuit_t));
+    circuit_t * m = malloc(sizeof(circuit_t));
+    m->input_cnt = 0;
+    m->output_cnt = 0;
+    m->gate_cnt = 0;
 
     // copy primary inputs
     m->input_cnt = a->input_cnt;
-    memcpy(m->inputs, a->inputs, sizeof(a->inputs));
+
+    for (int i = 0; i < a->input_cnt; i++)
+    {
+        strcpy(m->inputs[i], a->inputs[i]);
+    }
 
     // copy gates from circuit_a with prefix "a_"
     for (int i = 0; i < a->gate_cnt; i++)
     {
-        gate_t * g = &m->gates[m->gate_cnt];
-        *g = a->gates[i]; // copy struct
+        // copy gate
+        gate_t g = a->gates[i];
 
         // rename gate output
-        sprintf(g->output, "a_%s", a->gates[i].output);
+        sprintf(g.output, "a_%s", a->gates[i].output);
 
         // rename gate inputs if they are not primary inputs
-        for (int j = 0; j < g->input_cnt; j++)
+        for (int j = 0; j < g.input_cnt; j++)
         {
             int is_primary = 0;
 
+            // check if gate input is circuit input
             for (int k = 0; k < a->input_cnt; k++)
             {
-                if (strcmp(a->gates[i].inputs[j], a->inputs[k]) == 0)
+                if (strcmp(g.inputs[j], a->inputs[k]) == 0)
                 {
                     is_primary = 1;
                     break;
@@ -337,34 +360,31 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
             if (is_primary == 0)
             {
-                sprintf(g->inputs[j], "a_%s", a->gates[i].inputs[j]);
-            }
-            else
-            {
-                strcpy(g->inputs[j], a->gates[i].inputs[j]);
+                sprintf(g.inputs[j], "a_%s", a->gates[i].inputs[j]);
             }
         }
 
+        m->gates[m->gate_cnt] = g;
         m->gate_cnt++;
     }
 
     // copy gates from b with prefix "b_"
     for (int i = 0; i < b->gate_cnt; i++)
     {
-        gate_t * g = &m->gates[m->gate_cnt];
-        *g = b->gates[i];
+        // copy gate
+        gate_t g = b->gates[i];
 
         // rename gate output
-        sprintf(g->output, "b_%s", b->gates[i].output);
+        sprintf(g.output, "b_%s", b->gates[i].output);
 
         // rename gate inputs if they are not primary inputs
-        for (int j = 0; j < g->input_cnt; j++)
+        for (int j = 0; j < g.input_cnt; j++)
         {
             int is_primary = 0;
 
             for (int k = 0; k < b->input_cnt; k++)
             {
-                if (strcmp(b->gates[i].inputs[j], b->inputs[k]) == 0)
+                if (strcmp(g.inputs[j], b->inputs[k]) == 0)
                 {
                     is_primary = 1;
                     break;
@@ -373,47 +393,48 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
             if (is_primary == 0)
             {
-                sprintf(g->inputs[j], "b_%s", b->gates[i].inputs[j]);
-            }
-            else
-            {
-                strcpy(g->inputs[j], b->gates[i].inputs[j]);
+                sprintf(g.inputs[j], "b_%s", b->gates[i].inputs[j]);
             }
         }
 
+        m->gates[m->gate_cnt] = g;
         m->gate_cnt++;
     }
 
     // connect all the output pairs to a 2-input XOR gate
-
+    // FIXME: right now this works but in future outputs might not
+    // be in same index of output array so might need to search for the
+    // name and use that index
     for (int i = 0; i < a->output_cnt; i++)
     {
-        gate_t * xor_gate = &m->gates[m->gate_cnt];
-        memset(xor_gate, 0, sizeof(gate_t));
-        xor_gate->type = XOR;
-        xor_gate->input_cnt = 2;
+        gate_t xor_gate;
+        xor_gate.type = XOR;
+        xor_gate.input_cnt = 2;
 
-        sprintf(xor_gate->inputs[0], "a_%s", a->outputs[i]);
-        sprintf(xor_gate->inputs[1], "b_%s", b->outputs[i]);
-        sprintf(xor_gate->output, "xor_out_%d", i);
+        sprintf(xor_gate.inputs[0], "a_%s", a->outputs[i]);
+        sprintf(xor_gate.inputs[1], "b_%s", b->outputs[i]);
+        sprintf(xor_gate.output, "xor_%d", i);
 
+        m->gates[m->gate_cnt] = xor_gate;
         m->gate_cnt++;
     }
 
-    // connect all of the XOR gates or a single OR
+    // connect all of the XOR gates to a single OR gate
 
-    gate_t * or_gate = &m->gates[m->gate_cnt];
-    or_gate->type = OR;
-    or_gate->input_cnt = a->output_cnt;
+    gate_t or_gate;
+    or_gate.type = OR;
+    or_gate.input_cnt = a->output_cnt;
 
     for (int i = 0; i < a->output_cnt; i++)
     {
-        sprintf(or_gate->inputs[i], "xor_out_%d", i);
+        // FIXME: this might be a lazy solution
+        sprintf(or_gate.inputs[i], "xor_%d", i);
     }
 
-    strcpy(or_gate->output, "miter_out");
+    strcpy(or_gate.output, "miter");
+    m->gates[m->gate_cnt] = or_gate;
     m->gate_cnt++;
-    strcpy(m->outputs[0], "miter_out");
+    strcpy(m->outputs[0], "miter");
     m->output_cnt = 1;
 
     return m;
@@ -421,7 +442,7 @@ circuit_t * miter_struct(circuit_t * a, circuit_t * b)
 
 int new_id(const char * name)
 {
-    map = realloc(map, (id_cnt) + 1 * sizeof(map_t));
+    map = realloc(map, (id_cnt + 1) * sizeof(map_t));
     strcpy(map[id_cnt].name, name);
     map[id_cnt].id = id_cnt + 1;
     id_cnt++;
@@ -443,6 +464,16 @@ int get_id(const char * name)
     return new_id(name);
 }
 
+void print_map()
+{
+    printf("*** map ***\n");
+
+    for (int i = 0; i < id_cnt; i++)
+    {
+        printf("map[%d]: name='%s', id=%d\n", i, map[i].name, map[i].id);
+    }
+}
+
 // This solution is a little scuffed as I am manually programming all the
 // transfermations
 // I am pretty sure I can use a tree to build all of the clauses
@@ -450,7 +481,10 @@ int get_id(const char * name)
 // can make a better later
 // TODO: store clauses in a struct so that I can properly count how
 // many there are. Then I need to add the last output or something as
-// a final clauses
+// a final clause
+// AND: C = A & B ; (~A | ~B | C) & (A | ~C) & (B | ~C)
+// OR : C = A | B ; (A | B | ~C) & (~A | C) & (~B | C)
+
 int tseytin_transform(circuit_t * const cir, const char * file_name)
 {
     FILE * dimacs_fptr = fopen(file_name, "w");
@@ -461,45 +495,42 @@ int tseytin_transform(circuit_t * const cir, const char * file_name)
         return 1;
     }
 
-    // formal file header
-    int var_cnt = cir->input_cnt  + cir->gate_cnt;
-    int clause_cnt = 0;
-
-    for (int i = 0; i < cir->gate_cnt; i++)
-    {
-        clause_cnt += cir->gates[i].input_cnt + 1;
-    }
-
-    fprintf(dimacs_fptr, "p cnf %d %d\n", var_cnt, clause_cnt);
-
     // assign a unique ID to every input
     for (int i = 0; i < cir->input_cnt; i++)
     {
-        new_id(cir->inputs[i]);
+        int temp = get_id(cir->inputs[i]);
     }
 
     // assign a unique ID to every gate output
     for (int i = 0; i < cir->gate_cnt; i++)
     {
-        new_id(cir->gates[i].output);
+        int temp = get_id(cir->gates[i].output);
     }
+
+    print_map();
+
+    int clauses_cnt = 0;
+
+    // FIXME:
+    // temp write header at the top of file then seek later to overwrite
+    // with correct clause count. this is bad tho and should fix by storing all
+    // the clauses in a data structure and printing later
+    fprintf(dimacs_fptr, "p cnf 00 00\n");
 
     // get the cnf form of every gate in the circuit
     for (int i = 0; i < cir->gate_cnt; i++)
     {
         // generate AND CNF
-        // format: (a | ~c) & (b | ~c) & (~a | ~b | c)
-        //         a -c 0
-        //         b -c 0
-        //         c -a -b 0
         if (cir->gates[i].type == AND)
         {
             int output_id = get_id(cir->gates[i].output);
 
             for (int j = 0; j < cir->gates[i].input_cnt; j++)
             {
+// FIXME: for some reason ID 3 keeps getting changed to 13 here
                 int input_id = get_id(cir->gates[i].inputs[j]);
                 fprintf(dimacs_fptr, "%d -%d 0\n", input_id, output_id);
+                clauses_cnt++;
             }
 
             fprintf(dimacs_fptr, "%d ", output_id);
@@ -511,12 +542,9 @@ int tseytin_transform(circuit_t * const cir, const char * file_name)
             }
 
             fprintf(dimacs_fptr, "0\n");
+            clauses_cnt++;
         }
         // generate OR CNF
-        // format: (~a | c) & (~b | c) & (a | b | ~c)
-        //         -a c 0
-        //         -b c 0
-        //         -c a b 0
         else if (cir->gates[i].type == OR)
         {
             int output_id = get_id(cir->gates[i].output);
@@ -525,6 +553,7 @@ int tseytin_transform(circuit_t * const cir, const char * file_name)
             {
                 int input_id = get_id(cir->gates[i].inputs[j]);
                 fprintf(dimacs_fptr, "-%d %d 0\n", input_id, output_id);
+                clauses_cnt++;
             }
 
             fprintf(dimacs_fptr, "-%d ", output_id);
@@ -536,6 +565,7 @@ int tseytin_transform(circuit_t * const cir, const char * file_name)
             }
 
             fprintf(dimacs_fptr, "0\n");
+            clauses_cnt++;
         }
         // genreate XOR
         else if (cir->gates[i].type == XOR)
@@ -548,9 +578,17 @@ int tseytin_transform(circuit_t * const cir, const char * file_name)
             fprintf(dimacs_fptr, "%d -%d %d 0\n", input1_id, input2_id, output_id);
             fprintf(dimacs_fptr, "-%d %d %d 0\n", input1_id, input2_id, output_id);
             fprintf(dimacs_fptr, "-%d -%d -%d 0\n", input1_id, input2_id, output_id);
+            clauses_cnt += 4;
         }
     }
 
+    // end with circuit output gate doing stuff
+    fprintf(dimacs_fptr, "%d 0\n", get_id(cir->outputs[0]));
+    clauses_cnt++;
+
+    // temp fix for clause cnt
+    fseek(dimacs_fptr, 0, SEEK_SET);
+    fprintf(dimacs_fptr, "p cnf %d %d\n", id_cnt, clauses_cnt);
     fclose(dimacs_fptr);
 
     return 0;
