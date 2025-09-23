@@ -49,11 +49,20 @@ static struct logic_gates * miter_struct(struct logic_gates * a, struct logic_ga
 
 static int new_id(const char * name);
 static int get_id(const char * name);
+static void add_vars(int * vars, const int size);
 static void print_map();
-static int tseytin_transform(struct logic_gates * lg, const char * file_name);
+static void print_cnf();
+static void print_cnf_file(const char * file_name);
+static int tseytin_transform(struct logic_gates * lg);
 
+// struct array holding the names of variables and their corresponding id
 static map_t * map = NULL;
 static int id_cnt = 0;
+
+// int array hold all the variables for cnf clauses seperated with a 0
+static int * cnf = NULL;
+static int cnf_size = 0; // number of bytes
+static int cnf_clause_cnt = 0; // number of clauses
 
 int main(int argc, char ** args)
 {
@@ -71,8 +80,27 @@ int main(int argc, char ** args)
     print_bench(b);
     print_bench(miter);
 
-    tseytin_transform(miter, args[3]);
+    tseytin_transform(miter);
 
+    print_cnf();
+    print_cnf_file(args[3]);
+/*
+    int clause1[] = {1, 2, -3, 0};
+    int clause2[] = {-1, 4, 0};
+    int clause3[] = {2, -4, 5, 0};
+
+    add_vars(clause1, sizeof(clause1));
+    add_vars(clause2, sizeof(clause2));
+    add_vars(clause3, sizeof(clause3));
+    printf("%d\n", cnf_size);
+
+    for (int i = 0; i < cnf_size / sizeof(int); i++)
+    {
+        printf("%d ", cnf[i]);
+    }
+
+    printf("\n");
+*/
     return 0;
 }
 
@@ -474,6 +502,84 @@ void print_map()
     }
 }
 
+void add_vars(int * vars, const int size)
+{
+    if (vars == NULL || size <= 0)
+    {
+        return;
+    }
+
+    int len = size / sizeof(int);
+    int cnf_len = cnf_size / sizeof(int);
+
+    cnf = realloc(cnf, cnf_size + size);
+    cnf_size += size;
+
+    for (int i = 0; i < len; i++)
+    {
+        cnf[cnf_len + i] = vars[i];
+
+        // check if we ended a clause
+        if (vars[i] == 0)
+        {
+            cnf_clause_cnt++;
+        }
+    }
+}
+
+static void print_cnf()
+{
+    printf("*** cnf ***\n");
+    printf("p cnf %d %d\n", id_cnt, cnf_clause_cnt);
+
+    int len = cnf_size / sizeof(int);
+
+    for (int i = 0; i < len; i++)
+    {
+        if (cnf[i] == 0)
+        {
+            printf("0\n");
+        }
+        else
+        {
+            printf("%d ", cnf[i]);
+        }
+    }
+}
+
+static void print_cnf_file(const char * file_name)
+{
+    FILE * dimacs_fptr = fopen(file_name, "w");
+
+    if (dimacs_fptr == NULL)
+    {
+        printf("ERROR: unable to open file %s\n", file_name);
+        return;
+    }
+
+    // print header
+    fprintf(dimacs_fptr, "p cnf %d %d\n", id_cnt, cnf_clause_cnt);
+
+    int len = cnf_size / sizeof(int);
+
+    for (int i = 0; i < len; i++)
+    {
+        int var = cnf[i];
+
+        // check if at the end of clause
+        if (var == 0)
+        {
+            fprintf(dimacs_fptr, "0\n");
+        }
+        else
+        {
+            fprintf(dimacs_fptr, "%d ", cnf[i]);
+        }
+    }
+
+    fclose(dimacs_fptr);
+}
+
 // This solution is a little scuffed as I am manually programming all the
 // transfermations
 // I am pretty sure I can use a tree to build all of the clauses
@@ -485,111 +591,95 @@ void print_map()
 // AND: C = A & B ; (~A | ~B | C) & (A | ~C) & (B | ~C)
 // OR : C = A | B ; (A | B | ~C) & (~A | C) & (~B | C)
 
-int tseytin_transform(struct logic_gates * const cir, const char * file_name)
+int tseytin_transform(struct logic_gates * lg)
 {
-    FILE * dimacs_fptr = fopen(file_name, "w");
-
-    if (dimacs_fptr == NULL)
-    {
-        printf("ERROR: could not open .dimacs file\n");
-        return 1;
-    }
-
     // assign a unique ID to every input
-    for (int i = 0; i < cir->input_cnt; i++)
+    for (int i = 0; i < lg->input_cnt; i++)
     {
-        int temp = get_id(cir->inputs[i]);
+        int temp = get_id(lg->inputs[i]);
     }
 
     // assign a unique ID to every gate output
-    for (int i = 0; i < cir->gate_cnt; i++)
+    for (int i = 0; i < lg->gate_cnt; i++)
     {
-        int temp = get_id(cir->gates[i].output);
+        int temp = get_id(lg->gates[i].output);
     }
 
-    print_map();
-
-    int clauses_cnt = 0;
-
-    // FIXME:
-    // temp write header at the top of file then seek later to overwrite
-    // with correct clause count. this is bad tho and should fix by storing all
-    // the clauses in a data structure and printing later
-    fprintf(dimacs_fptr, "p cnf 00 00\n");
-
     // get the cnf form of every gate in the circuit
-    for (int i = 0; i < cir->gate_cnt; i++)
+    for (int i = 0; i < lg->gate_cnt; i++)
     {
         // generate AND CNF
-        if (cir->gates[i].type == AND)
+        if (lg->gates[i].type == AND)
         {
-            int output_id = get_id(cir->gates[i].output);
+            int output_id = get_id(lg->gates[i].output);
 
-            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            for (int j = 0; j < lg->gates[i].input_cnt; j++)
             {
-// FIXME: for some reason ID 3 keeps getting changed to 13 here
-                int input_id = get_id(cir->gates[i].inputs[j]);
-                fprintf(dimacs_fptr, "%d -%d 0\n", input_id, output_id);
-                clauses_cnt++;
+                int input_id = get_id(lg->gates[i].inputs[j]);
+                int clause[] = { input_id, -output_id, 0 };
+                add_vars(clause, sizeof(clause));
             }
 
-            fprintf(dimacs_fptr, "%d ", output_id);
+            int var[] = { output_id };
+            add_vars(var, sizeof(var));
 
-            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            for (int j = 0; j < lg->gates[i].input_cnt; j++)
             {
-                int input_id = get_id(cir->gates[i].inputs[j]);
-                fprintf(dimacs_fptr, "-%d ", input_id);
+                int input_id = get_id(lg->gates[i].inputs[j]);
+                int what[] = { -input_id };
+                add_vars(what, sizeof(what));
             }
 
-            fprintf(dimacs_fptr, "0\n");
-            clauses_cnt++;
+            int huh[] = { 0 };
+            add_vars(huh, sizeof(huh));
         }
         // generate OR CNF
-        else if (cir->gates[i].type == OR)
+        else if (lg->gates[i].type == OR)
         {
-            int output_id = get_id(cir->gates[i].output);
+            int output_id = get_id(lg->gates[i].output);
 
-            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            for (int j = 0; j < lg->gates[i].input_cnt; j++)
             {
-                int input_id = get_id(cir->gates[i].inputs[j]);
-                fprintf(dimacs_fptr, "-%d %d 0\n", input_id, output_id);
-                clauses_cnt++;
+                int input_id = get_id(lg->gates[i].inputs[j]);
+                int clause[] = { -input_id, output_id, 0 };
+                add_vars(clause, sizeof(clause));
             }
 
-            fprintf(dimacs_fptr, "-%d ", output_id);
+            int var[] = { -output_id };
+            add_vars(var, sizeof(var));
 
-            for (int j = 0; j < cir->gates[i].input_cnt; j++)
+            for (int j = 0; j < lg->gates[i].input_cnt; j++)
             {
-                int input_id = get_id(cir->gates[i].inputs[j]);
-                fprintf(dimacs_fptr, "%d ", input_id);
+                int input_id = get_id(lg->gates[i].inputs[j]);
+                int what[] = { input_id };
+                add_vars(what, sizeof(what));
             }
 
-            fprintf(dimacs_fptr, "0\n");
-            clauses_cnt++;
+            int huh[] = { 0 };
+            add_vars(huh, sizeof(huh));
         }
         // genreate XOR
-        else if (cir->gates[i].type == XOR)
+        else if (lg->gates[i].type == XOR)
         {
-            int output_id = get_id(cir->gates[i].output);
-            int input1_id = get_id(cir->gates[i].inputs[0]);
-            int input2_id = get_id(cir->gates[i].inputs[1]);
+            int output_id = get_id(lg->gates[i].output);
+            int input1_id = get_id(lg->gates[i].inputs[0]);
+            int input2_id = get_id(lg->gates[i].inputs[1]);
 
-            fprintf(dimacs_fptr, "%d %d -%d 0\n", input1_id, input2_id, output_id);
-            fprintf(dimacs_fptr, "%d -%d %d 0\n", input1_id, input2_id, output_id);
-            fprintf(dimacs_fptr, "-%d %d %d 0\n", input1_id, input2_id, output_id);
-            fprintf(dimacs_fptr, "-%d -%d -%d 0\n", input1_id, input2_id, output_id);
-            clauses_cnt += 4;
+            int clause1[] = { input1_id, input2_id, -output_id, 0 };
+            int clause2[] = { input1_id, -input2_id, output_id, 0 };
+            int clause3[] = { -input1_id, input2_id, output_id, 0 };
+            int clause4[] = { -input1_id, -input2_id, -output_id, 0};
+
+            add_vars(clause1, sizeof(clause1));
+            add_vars(clause2, sizeof(clause2));
+            add_vars(clause3, sizeof(clause3));
+            add_vars(clause4, sizeof(clause4));
         }
     }
 
     // end with circuit output gate doing stuff
-    fprintf(dimacs_fptr, "%d 0\n", get_id(cir->outputs[0]));
-    clauses_cnt++;
-
-    // temp fix for clause cnt
-    fseek(dimacs_fptr, 0, SEEK_SET);
-    fprintf(dimacs_fptr, "p cnf %d %d\n", id_cnt, clauses_cnt);
-    fclose(dimacs_fptr);
+    int wut[] = { get_id(lg->outputs[0]), 0};
+    add_vars(wut, sizeof(wut));
 
     return 0;
 }
