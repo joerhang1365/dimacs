@@ -2,6 +2,7 @@
 #include <string>
 #include "parse_bench.h"
 #include "miter.h"
+#include "cnf.h"
 
 int main(int argc, char * argv[])
 {
@@ -19,7 +20,7 @@ int main(int argc, char * argv[])
     logic_gates circuit_b;
     logic_gates miter;
 
-    std::cout << "parsing circuit a from " << circuit_a_file << std::endl;
+    cnf cnf;
 
     if (circuit_a.parse_bench(circuit_a_file) != 0)
     {
@@ -28,7 +29,6 @@ int main(int argc, char * argv[])
     }
 
     circuit_a.print_bench();
-    std::cout << "parsing circuit b from " << circuit_b_file << std::endl;
 
     if (circuit_b.parse_bench(circuit_b_file) != 0)
     {
@@ -37,9 +37,10 @@ int main(int argc, char * argv[])
     }
 
     circuit_b.print_bench();
-    std::cout << "creating miter circuit" << circuit_b_file << std::endl;
     miter = create_miter(circuit_a, circuit_b);
     miter.print_bench();
+
+    cnf.transform(miter, output_file);
 
     return 0;
 }

@@ -2,7 +2,11 @@ CXX = g++
 CXXFLAGS = -std=c++11 -Wall -Wextra -O3
 TARGET = bin/ec
 
-OBJS = src/parse_bench.o src/miter.o src/main.o
+OBJS =  \
+	src/parse_bench.o \
+	src/miter.o \
+	src/cnf.o \
+	src/main.o \
 
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
