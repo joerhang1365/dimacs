@@ -9,17 +9,16 @@
 class cnf {
 public:
     cnf();
-    int transform_to_cnf(const circuit& a, const circuit& b,
-                         const std::string &output_filename);
+    void transform(const logic_gates& c, const std::string& filename);
+    void print_cnf() const;
                          
 private:
-    int var_count;
+    int var_cnt;
     std::unordered_map<std::string, int> var_map;
     std::vector<std::vector<int>> clauses;
 
-    int get_var(const std::string& name);
-    void add_clause(const std::vector<int>& clause);
-    void write_cnf(const std::string& filename);
+    int get_var_id(const std::string& name);
+    void gate_to_cnf(const gate& g);
 };
 
 #endif

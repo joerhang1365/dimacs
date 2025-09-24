@@ -12,7 +12,7 @@ inline std::string trim(const std::string& s)
     return (start < end) ? std::string(start, end) : "";
 }
 
-gate_type circuit::string_to_gate_type(const std::string& str)
+gate_type logic_gates::string_to_gate_type(const std::string& str)
 {
     if (str == "AND")
     {
@@ -48,7 +48,7 @@ gate_type circuit::string_to_gate_type(const std::string& str)
     }
 }   
 
-std::string circuit::parse_pin_name(const std::string& str)
+std::string logic_gates::parse_pin_name(const std::string& str)
 {
     size_t start = str.find('(');
     size_t end = str.find(')');
@@ -61,9 +61,10 @@ std::string circuit::parse_pin_name(const std::string& str)
     return "";
 }
 
-int circuit::parse_bench(const std::string& filename)
+int logic_gates::parse_bench(const std::string& filename)
 {
     std::ifstream file;
+    
     file.open(filename);
 
     if (!file.is_open())
@@ -97,7 +98,8 @@ int circuit::parse_bench(const std::string& filename)
             // gate format: output_pin = GATE(input1, input2, ...)
             gate gate;
 
-            // output pin
+            // parse the output pin name
+
             size_t equal_pos = line.find('=');
             
             if (equal_pos == std::string::npos)
@@ -108,7 +110,8 @@ int circuit::parse_bench(const std::string& filename)
             gate.output = line.substr(0, equal_pos);
             gate.output = trim(gate.output);
             
-            // gate type and inputs
+            // parse gate type and inputs
+
             size_t left_parenthesis = line.find('(', equal_pos);
             size_t right_parenthesis = line.find(')', equal_pos);
 
@@ -123,6 +126,7 @@ int circuit::parse_bench(const std::string& filename)
             gate.type = string_to_gate_type(type_str);
             
             // inputs
+            
             std::string inputs_str = line.substr(left_parenthesis + 1, right_parenthesis - left_parenthesis - 1);
             std::istringstream iss(inputs_str);
             std::string input;
@@ -141,7 +145,7 @@ int circuit::parse_bench(const std::string& filename)
     return 0;
 }
 
-void circuit::print_bench() const
+void logic_gates::print_bench() const
 {
     std::cout <<"*** Circuit ***\n";
     for (const auto& input : primary_inputs)

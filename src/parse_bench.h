@@ -12,7 +12,7 @@ struct gate {
     std::vector<std::string> inputs;
 };
 
-class circuit {
+class logic_gates {
 public:
     std::vector<std::string> primary_inputs;
     std::vector<std::string> primary_outputs;
