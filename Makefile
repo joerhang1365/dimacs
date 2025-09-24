@@ -1,25 +1,17 @@
-CC=$(PREFIX)gcc
+CXX = g++
+CXXFLAGS = -std=c++11 -Wall -Wextra -O3
+TARGET = bin/ec
 
-CFLAGS = -Wall -Werror=implicit-function-declaration
-CFLAGS += -I.
-CFLAGS += -g -o -DDEBUG
+OBJS = src/parse_bench.o src/main.o
 
-TARGET=bin/ec
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
 
-build: $(TARGET)
-
-$(TARGET): src/main.c
-	$(CC) $(CFLAGS) -o $@ $<
+# Pattern rule to build .o from .cpp
+src/%.o: src/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(TARGET) *.dimacs
+	rm -f $(TARGET) src/*.o
 
-.PHONY: build clean
-
-# tests
-
-test-ex: $(TARGET)
-	./$(TARGET) testcase/example_A.bench testcase/example_B.bench example.dimacs
-
-test-c17: $(TARGET)
-	./$(TARGET) testcase/c17_A.bench testcase/c17_B.bench c17.dimacs
+.PHONY: all clean
