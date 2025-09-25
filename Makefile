@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall -Wextra -O3
+CXXFLAGS = -std=c++11 -Wall -Wextra -g
 TARGET = bin/ec
 
 OBJS =  \
@@ -8,19 +8,29 @@ OBJS =  \
 	src/cnf.o \
 	src/main.o \
 
-build: $(TARGET)
+build: bin $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-# Pattern rule to build .o from .cpp
+# build .o from .cpp
 src/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-clean:
-	rm -f $(TARGET) src/*.o
+bin:
+	mkdir -p bin
 
-.PHONY: build clean
+clean:
+	rm -rf src/*.o *.dimacs *.output bin
 
 test-ex:
 	./bin/ec testcase/example_A.bench testcase/example_B.bench example.dimacs
+
+test-c17:
+	./bin/ec testcase/c17_A.bench testcase/c17_B.bench c17.dimacs
+
+test-c432:
+	./bin/ec testcase/c432_A.bench testcase/c432_B.bench c432.dimacs
+
+
+.PHONY: build clean

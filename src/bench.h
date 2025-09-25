@@ -24,8 +24,4 @@ public:
 private:
 };
 
-//static gate_type string_to_type(const std::string& str);
-//static std::string type_to_string(const gate_type& type);
-//static std::string parse_pin_name(const std::string& str);
-
 #endif

@@ -1,11 +1,10 @@
 #include "bench.h"
 #include <fstream>
+#include <sstream>
 #include <iostream>
-#include <string.h>
 
 static gate_type string_to_type(const std::string& str);
 static std::string type_to_string(const gate_type& type);
-static std::string parse_pin_name(const std::string& str);
 
 gate_type string_to_type(const std::string& str)
 {
@@ -66,20 +65,6 @@ std::string type_to_string(const gate_type& type)
     }
 }
 
-std::string parse_pin_name(const std::string& str)
-{
-    size_t start = str.find('(');
-    size_t end = str.find(')');
-
-    // get the pin name for INPUT(pin_name) or OUTPUT(pin_name)
-    if (start != std::string::npos && end != std::string::npos && start < end)
-    {
-        return str.substr(start + 1, end - start - 1);
-    }
-
-    return "";
-}
-
 int logic_gates::parse_bench(const std::string& filename)
 {
     std::ifstream file;
@@ -104,70 +89,68 @@ int logic_gates::parse_bench(const std::string& filename)
 
         if (line.substr(0, 5) == "INPUT")
         {
-            std::string input = parse_pin_name(line);
+            std::string input;
+            size_t start = line.find('(');
+            size_t end = line.find(')');
+            
+            input = line.substr(start + 1, end - start - 1);
             primary_inputs.push_back(input);
         }
         else if (line.substr(0, 6) == "OUTPUT")
         {
-            std::string output = parse_pin_name(line);
+            std::string output;
+            size_t start = line.find('(');
+            size_t end = line.find(')');
+            
+            output = line.substr(start + 1, end - start - 1);
             primary_outputs.push_back(output);
         }
         else if (line.find('=') != std::string::npos)
         {
             // gate format: output_pin = GATE(input1, input2, ...)
+
             gate gate;
+    
+            size_t equal = line.find('=');
+            size_t left = line.find('(');
+            size_t right = line.find(')');
 
-            // turn std::string into char * because strtok is honestly easier
-            // use a seperate string so I can save the original pointer to free later
-            char * str = new char[line.size() + 1];
-            strcpy(str, line.c_str());
-
-            // parse the output pin name
-
-            char * token = strtok(str, " =");
-
-            if (token == nullptr)
-            {
-                std::cout << "ERROR: cannot find gate output in line: " << line << std::endl;
-                delete[] str; // gotta free the memory
-                continue;
-            }
-
-            gate.output = std::string(token);
+            // parse output pin
             
-            // parse gate type and inputs
+            std::string output;
+            output = line.substr(0, equal);
 
-            token = strtok(nullptr, "= (");
+            // remove any trailing spaces
+            output.erase(output.find_last_not_of(" \t") + 1, output.size());
+            gate.output = output;
 
-            if (token == nullptr)
+            // parse gate type
+
+            std::string type;
+            type = line.substr(equal + 1, left - equal - 1);
+
+            // remove any trailing spaces
+            type.erase(0, type.find_first_not_of(" \t"));
+            type.erase(type.find_last_not_of(" \t") + 1);
+            gate.type = string_to_type(type);
+
+            // parse input pins
+
+            std::string inputs;
+            inputs = line.substr(left + 1, right - left - 1);
+
+            std::stringstream ss;
+            ss << inputs;
+            std::string input;
+
+            while (std::getline(ss, input, ','))
             {
-                std::cout << "ERROR: cannot find gate type in line: " << line << std::endl;
-                delete[] str;
-                continue;
-            }
-
-            std::string type_str = std::string(token);
-            gate.type = string_to_type(type_str);
-            
-            // parse a variable number of inputs
-            
-            token = strtok(nullptr, ")");
-
-            while (token != nullptr)
-            {
-                std::string input = std::string(token);
+                // remove both leading and trailing spaces
+                input.erase(0, input.find_first_not_of(" \t"));
+                input.erase(input.find_last_not_of(" \t") + 1);
+                
                 gate.inputs.push_back(input);
-                token = strtok(nullptr, ", ");
             }
-
-            if (gate.inputs.empty())
-            {
-                std::cout << "ERROR: gate has no inputs in line: " << line << std::endl;
-                delete[] str;
-                continue;
-            }
-
-            delete[] str;
 
             gates.push_back(gate);
         }

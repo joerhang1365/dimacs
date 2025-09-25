@@ -25,23 +25,42 @@ logic_gates miter_structure(const logic_gates& a, const logic_gates& b)
 
     // change names of gate inputs and outputs to avoid conflicts
 
-    for (auto g : a.gates)
+    for (auto& g : a.gates)
     {
         gate updated_gate = g;
 
+        // rename gate output
         updated_gate.output = "a_" + g.output;
 
-        std::cout << updated_gate.inputs.size() << std::endl;
-        std::cout << updated_gate.inputs[0] << std::endl;
-        std::cout << updated_gate.inputs[1] << std::endl;
+        // check if gate input is a primary input
+        // if not change its name
+        for (auto& input : updated_gate.inputs) 
+        {
+            auto it = std::find(a.primary_inputs.begin(), a.primary_inputs.end(), input);
+            
+            if (it == a.primary_inputs.end())
+            {
+                input = "a_" + input;
+            }
+        }
 
-        //for (auto& input : updated_gate.inputs)
-        //{
-            // If input is a primary input, leave as is
-        //    if (std::find(a.primary_inputs.begin(), a.primary_inputs.end(), input) == a.primary_inputs.end()) {
-        //        input = "a_" + input;
-        //    }
-        //}
+        miter.gates.push_back(updated_gate);
+    }
+
+    for (auto& g : b.gates)
+    {
+        gate updated_gate = g;
+        updated_gate.output = "b_" + g.output;
+
+        for (auto& input : updated_gate.inputs) 
+        {
+            auto it = std::find(a.primary_inputs.begin(), a.primary_inputs.end(), input);
+            
+            if (it == a.primary_inputs.end())
+            {
+                input = "b_" + input;
+            }
+        }
 
         miter.gates.push_back(updated_gate);
     }

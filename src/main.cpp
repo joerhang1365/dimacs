@@ -8,7 +8,7 @@ int main(int argc, char * argv[])
 {
     if (argc != 4)
     {
-        std::cerr << "ERROR: invalid number of inputs" << std::endl;
+        std::cout << "ERROR: invalid number of inputs" << std::endl;
         return 1;
     }
 
