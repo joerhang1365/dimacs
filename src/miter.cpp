@@ -2,19 +2,19 @@
 #include <iostream>
 #include <algorithm>
 
-logic_gates create_miter(const logic_gates& a, const logic_gates& b)
+logic_gates miter_structure(const logic_gates& a, const logic_gates& b)
 {
-    // check that both circuits have the same primary input names
+    // check that both circuits have the same primary inputs
     if (a.primary_inputs != b.primary_inputs)
     {
-        std::cerr << "Error: circuits have different primary inputs" << std::endl;
+        std::cout << "Error: circuits have different primary inputs" << std::endl;
         return logic_gates();
     }
 
-    // check that both circuits have the same number of primary outputs
+    // check that both circuits have the same primary outputs
     if (a.primary_outputs != b.primary_outputs) 
     {
-        std::cerr << "Error: circuits have different number of primary outputs" << std::endl;
+        std::cout << "Error: circuits have different number of primary outputs" << std::endl;
         return logic_gates();
     }
 
@@ -25,44 +25,29 @@ logic_gates create_miter(const logic_gates& a, const logic_gates& b)
 
     // change names of gate inputs and outputs to avoid conflicts
 
-    for (auto& a_gate : a.gates)
+    for (auto g : a.gates)
     {
-        gate new_gate = a_gate;
-        new_gate.output = "a_" + new_gate.output;
+        gate updated_gate = g;
 
-        // check if gate input is a primary input
-        // if so, do not change its name
-        for (auto& input : new_gate.inputs)
-        {
-            if (std::find(a.primary_inputs.begin(), a.primary_inputs.end(), input) == a.primary_inputs.end())
-            {
-                input = "a_" + input;
-            }
-        }
+        updated_gate.output = "a_" + g.output;
 
-        miter.gates.push_back(new_gate);
+        std::cout << updated_gate.inputs.size() << std::endl;
+        std::cout << updated_gate.inputs[0] << std::endl;
+        std::cout << updated_gate.inputs[1] << std::endl;
+
+        //for (auto& input : updated_gate.inputs)
+        //{
+            // If input is a primary input, leave as is
+        //    if (std::find(a.primary_inputs.begin(), a.primary_inputs.end(), input) == a.primary_inputs.end()) {
+        //        input = "a_" + input;
+        //    }
+        //}
+
+        miter.gates.push_back(updated_gate);
     }
 
-    for (auto& b_gate : b.gates)
-    {
-        gate new_gate = b_gate;
-        new_gate.output = "b_" + new_gate.output;
-
-        // check if gate input is a primary input
-        // if so, do not change its name
-        for (auto& input : new_gate.inputs)
-        {
-            if (std::find(b.primary_inputs.begin(), b.primary_inputs.end(), input) == b.primary_inputs.end())
-            {
-                input = "b_" + input;
-            }
-        }
-
-        miter.gates.push_back(new_gate);
-    }
-
-    // create XOR gates for each output pair
-    // FIXME: outputs might not be at the same index of each circuit
+    // create XOR gates for each primary output pair
+    // FIXME: outputs might not be at the same index of each logic gates
     // so might need to search for the name instead
     
     std::vector<std::string> xor_outputs;

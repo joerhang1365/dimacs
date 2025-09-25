@@ -3,10 +3,12 @@ CXXFLAGS = -std=c++11 -Wall -Wextra -O3
 TARGET = bin/ec
 
 OBJS =  \
-	src/parse_bench.o \
+	src/bench.o \
 	src/miter.o \
 	src/cnf.o \
 	src/main.o \
+
+build: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^
@@ -18,4 +20,7 @@ src/%.o: src/%.cpp
 clean:
 	rm -f $(TARGET) src/*.o
 
-.PHONY: all clean
+.PHONY: build clean
+
+test-ex:
+	./bin/ec testcase/example_A.bench testcase/example_B.bench example.dimacs

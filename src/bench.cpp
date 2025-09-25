@@ -1,18 +1,13 @@
-#include "parse_bench.h"
+#include "bench.h"
 #include <fstream>
-#include <sstream>
 #include <iostream>
-#include <algorithm>
-#include <cctype>
+#include <string.h>
 
-inline std::string trim(const std::string& s) 
-{
-    auto start = std::find_if_not(s.begin(), s.end(), ::isspace);
-    auto end = std::find_if_not(s.rbegin(), s.rend(), ::isspace).base();
-    return (start < end) ? std::string(start, end) : "";
-}
+static gate_type string_to_type(const std::string& str);
+static std::string type_to_string(const gate_type& type);
+static std::string parse_pin_name(const std::string& str);
 
-gate_type logic_gates::string_to_gate_type(const std::string& str)
+gate_type string_to_type(const std::string& str)
 {
     if (str == "AND")
     {
@@ -48,11 +43,35 @@ gate_type logic_gates::string_to_gate_type(const std::string& str)
     }
 }   
 
-std::string logic_gates::parse_pin_name(const std::string& str)
+std::string type_to_string(const gate_type& type)
+{
+    switch (type)
+    {
+    case gate_type::AND: 
+        return "AND";
+    case gate_type::NAND: 
+        return "NAND";
+    case gate_type::OR: 
+        return "OR";
+    case gate_type::NOR: 
+        return "NOR";
+    case gate_type::NOT: 
+        return "NOT";
+    case gate_type::XOR: 
+        return "XOR";
+    case gate_type::BUFF: 
+        return "BUFF";
+    default: 
+        return "UNKNOWN";
+    }
+}
+
+std::string parse_pin_name(const std::string& str)
 {
     size_t start = str.find('(');
     size_t end = str.find(')');
 
+    // get the pin name for INPUT(pin_name) or OUTPUT(pin_name)
     if (start != std::string::npos && end != std::string::npos && start < end)
     {
         return str.substr(start + 1, end - start - 1);
@@ -69,7 +88,7 @@ int logic_gates::parse_bench(const std::string& filename)
 
     if (!file.is_open())
     {
-        std::cerr << "ERROR: cannot open file " << filename << std::endl;
+        std::cout << "ERROR: cannot open file " << filename << std::endl;
         return 1;
     }
 
@@ -98,43 +117,57 @@ int logic_gates::parse_bench(const std::string& filename)
             // gate format: output_pin = GATE(input1, input2, ...)
             gate gate;
 
+            // turn std::string into char * because strtok is honestly easier
+            // use a seperate string so I can save the original pointer to free later
+            char * str = new char[line.size() + 1];
+            strcpy(str, line.c_str());
+
             // parse the output pin name
 
-            size_t equal_pos = line.find('=');
-            
-            if (equal_pos == std::string::npos)
+            char * token = strtok(str, " =");
+
+            if (token == nullptr)
             {
+                std::cout << "ERROR: cannot find gate output in line: " << line << std::endl;
+                delete[] str; // gotta free the memory
                 continue;
             }
 
-            gate.output = line.substr(0, equal_pos);
-            gate.output = trim(gate.output);
+            gate.output = std::string(token);
             
             // parse gate type and inputs
 
-            size_t left_parenthesis = line.find('(', equal_pos);
-            size_t right_parenthesis = line.find(')', equal_pos);
+            token = strtok(nullptr, "= (");
 
-            if (left_parenthesis == std::string::npos || right_parenthesis == std::string::npos || 
-                left_parenthesis >= right_parenthesis)
+            if (token == nullptr)
             {
+                std::cout << "ERROR: cannot find gate type in line: " << line << std::endl;
+                delete[] str;
                 continue;
             }
 
-            std::string type_str = line.substr(equal_pos + 1, left_parenthesis - equal_pos - 1);
-            type_str = trim(type_str);
-            gate.type = string_to_gate_type(type_str);
+            std::string type_str = std::string(token);
+            gate.type = string_to_type(type_str);
             
-            // inputs
+            // parse a variable number of inputs
             
-            std::string inputs_str = line.substr(left_parenthesis + 1, right_parenthesis - left_parenthesis - 1);
-            std::istringstream iss(inputs_str);
-            std::string input;
+            token = strtok(nullptr, ")");
 
-            while (std::getline(iss, input, ','))
+            while (token != nullptr)
             {
-                gate.inputs.push_back(trim(input));
+                std::string input = std::string(token);
+                gate.inputs.push_back(input);
+                token = strtok(nullptr, ", ");
             }
+
+            if (gate.inputs.empty())
+            {
+                std::cout << "ERROR: gate has no inputs in line: " << line << std::endl;
+                delete[] str;
+                continue;
+            }
+
+            delete[] str;
 
             gates.push_back(gate);
         }
@@ -147,7 +180,6 @@ int logic_gates::parse_bench(const std::string& filename)
 
 void logic_gates::print_bench() const
 {
-    std::cout <<"*** Circuit ***\n";
     for (const auto& input : primary_inputs)
     {
         std::cout << "INPUT(" << input << ")\n";
@@ -165,44 +197,19 @@ void logic_gates::print_bench() const
     for (const auto& gate : gates)
     {
         std::cout << gate.output << " = ";
-
-        switch (gate.type)
-        {
-        case gate_type::AND: 
-            std::cout << "AND"; 
-            break;
-        case gate_type::NAND: 
-            std::cout << "NAND"; 
-            break;
-        case gate_type::OR: 
-            std::cout << "OR"; 
-            break;
-        case gate_type::NOR: 
-            std::cout << "NOR"; 
-            break;
-        case gate_type::NOT: 
-            std::cout << "NOT"; 
-            break;
-        case gate_type::XOR: 
-            std::cout << "XOR"; 
-            break;
-        case gate_type::BUFF: 
-            std::cout << "BUFF"; 
-            break;
-        default: 
-            std::cout << "UNKNOWN"; 
-            break;
-        }
-
+        std::cout << type_to_string(gate.type);
         std::cout << "(";
-        for (size_t i = 0; i < gate.inputs.size(); ++i)
+
+        for (size_t i = 0; i < gate.inputs.size(); i++)
         {
             std::cout << gate.inputs[i];
+
             if (i < gate.inputs.size() - 1)
             {
                 std::cout << ", ";
             }
         }
+
         std::cout << ")\n";
     }
 

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include "parse_bench.h"
+#include "bench.h"
 #include "miter.h"
 #include "cnf.h"
 
@@ -24,7 +24,7 @@ int main(int argc, char * argv[])
 
     if (circuit_a.parse_bench(circuit_a_file) != 0)
     {
-        std::cerr << "ERROR: failed to parse circuit a" << std::endl;
+        std::cout << "ERROR: failed to parse circuit a" << std::endl;
         return 1;
     }
 
@@ -32,15 +32,16 @@ int main(int argc, char * argv[])
 
     if (circuit_b.parse_bench(circuit_b_file) != 0)
     {
-        std::cerr << "ERROR: failed to parse circuit B" << std::endl;
+        std::cout << "ERROR: failed to parse circuit b" << std::endl;
         return 1;
     }
 
     circuit_b.print_bench();
-    miter = create_miter(circuit_a, circuit_b);
+    miter = miter_structure(circuit_a, circuit_b);
     miter.print_bench();
 
-    cnf.transform(miter, output_file);
+    cnf.transform(miter);
+    cnf.print_cnt(output_file);
 
     return 0;
 }

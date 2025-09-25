@@ -1,5 +1,5 @@
-#ifndef PARSE_BENCH_H_
-#define PARSE_BENCH_H_
+#ifndef BENCH_H_
+#define BENCH_H_
 
 #include <string>
 #include <vector>
@@ -22,8 +22,10 @@ public:
     void print_bench() const;
 
 private:
-    gate_type string_to_gate_type(const std::string& str);
-    std::string parse_pin_name(const std::string& str);
 };
+
+//static gate_type string_to_type(const std::string& str);
+//static std::string type_to_string(const gate_type& type);
+//static std::string parse_pin_name(const std::string& str);
 
 #endif
