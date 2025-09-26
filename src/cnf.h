@@ -1,3 +1,6 @@
+// cnf.h
+//
+
 #ifndef CNF_H_
 #define CNF_H_
 
@@ -9,15 +12,15 @@
 class cnf {
 public:
     cnf();
-    void transform(const logic_gates& lg);
-    void print_cnt(const std::string& filename) const;
+    int transform(const logic_gates& lg);
+    void print_dimacs_file(const std::string& filename) const;
 
 private:
     std::unordered_map<std::string, int> var_map;
     std::vector<std::vector<int>> clauses;
     int var_cnt;
 
-    int get_var_id(const std::string& name);
+    int get_var(const std::string& name);
 };
 
-#endif
+#endif // CNF_H_

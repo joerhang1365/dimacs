@@ -1,3 +1,6 @@
+// bench.h
+//
+
 #ifndef BENCH_H_
 #define BENCH_H_
 
@@ -18,10 +21,10 @@ public:
     std::vector<std::string> primary_outputs;
     std::vector<gate> gates;
 
-    int parse_bench(const std::string& filename);
-    void print_bench() const;
+    int parse_bench_file(const std::string& filename);
+    void print() const;
 
 private:
 };
 
-#endif
+#endif // BENCH_H_

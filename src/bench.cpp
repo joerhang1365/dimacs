@@ -65,7 +65,7 @@ std::string type_to_string(const gate_type& type)
     }
 }
 
-int logic_gates::parse_bench(const std::string& filename)
+int logic_gates::parse_bench_file(const std::string& filename)
 {
     std::ifstream file;
     
@@ -90,19 +90,19 @@ int logic_gates::parse_bench(const std::string& filename)
         if (line.substr(0, 5) == "INPUT")
         {
             std::string input;
-            size_t start = line.find('(');
-            size_t end = line.find(')');
+            size_t left_parenthesis = line.find('(');
+            size_t right_parenthesis = line.find(')');
             
-            input = line.substr(start + 1, end - start - 1);
+            input = line.substr(left_parenthesis + 1, right_parenthesis - left_parenthesis - 1);
             primary_inputs.push_back(input);
         }
         else if (line.substr(0, 6) == "OUTPUT")
         {
             std::string output;
-            size_t start = line.find('(');
-            size_t end = line.find(')');
+            size_t left_parenthesis = line.find('(');
+            size_t right_parenthesis = line.find(')');
             
-            output = line.substr(start + 1, end - start - 1);
+            output = line.substr(left_parenthesis + 1, right_parenthesis - left_parenthesis - 1);
             primary_outputs.push_back(output);
         }
         else if (line.find('=') != std::string::npos)
@@ -111,43 +111,45 @@ int logic_gates::parse_bench(const std::string& filename)
 
             gate gate;
     
-            size_t equal = line.find('=');
-            size_t left = line.find('(');
-            size_t right = line.find(')');
+            size_t equal_sign = line.find('=');
+            size_t left_parenthesis = line.find('(');
+            size_t right_parenthesis = line.find(')');
 
             // parse output pin
             
             std::string output;
-            output = line.substr(0, equal);
+            output = line.substr(0, equal_sign);
 
             // remove any trailing spaces
-            output.erase(output.find_last_not_of(" \t") + 1, output.size());
+            output.erase(output.find_last_not_of(" \t") + 1, std::string::npos);
             gate.output = output;
 
             // parse gate type
 
             std::string type;
-            type = line.substr(equal + 1, left - equal - 1);
+            type = line.substr(equal_sign + 1, left_parenthesis - equal_sign - 1);
 
             // remove any trailing spaces
             type.erase(0, type.find_first_not_of(" \t"));
-            type.erase(type.find_last_not_of(" \t") + 1);
+            type.erase(type.find_last_not_of(" \t") + 1, std::string::npos);
             gate.type = string_to_type(type);
 
             // parse input pins
 
             std::string inputs;
-            inputs = line.substr(left + 1, right - left - 1);
+            inputs = line.substr(left_parenthesis + 1, right_parenthesis - left_parenthesis - 1);
 
+            // use string stream to split inputs
             std::stringstream ss;
             ss << inputs;
             std::string input;
-
+ 
+            // get each input seperated by a comma
             while (std::getline(ss, input, ','))
             {
                 // remove both leading and trailing spaces
                 input.erase(0, input.find_first_not_of(" \t"));
-                input.erase(input.find_last_not_of(" \t") + 1);
+                input.erase(input.find_last_not_of(" \t") + 1, std::string::npos);
                 
                 gate.inputs.push_back(input);
             }
@@ -161,7 +163,7 @@ int logic_gates::parse_bench(const std::string& filename)
     return 0;
 }
 
-void logic_gates::print_bench() const
+void logic_gates::print() const
 {
     for (const auto& input : primary_inputs)
     {
