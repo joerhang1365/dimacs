@@ -24,10 +24,10 @@ int cnf::get_var(const std::string& name)
 }
 
 // assign each gate primary input, primary output, and gate output to a unique
-// variable. The transformations for each gate are hard coded in. Maybe there is
-// a more generic way to do this using trees but idk how rn.
+// variable. Then find the CNF or conjunctive normal form clauses using the
+// Tseytin transformation
 
-// Tseitin transformations:
+// Tseytin transformations
 // AND gate:  (C = A & B)    => (~A | ~B | C) & (A | ~C) & (B | ~C)
 // NAND gate: (C = ~(A | B)) => (~A | ~B | ~C) & (A | C) & (B | C)
 // OR  gate:  (C = A | B)    => (A | B | ~C) & (~A | C) & (~B | C)
@@ -36,34 +36,26 @@ int cnf::get_var(const std::string& name)
 // XOR gate:  (C = A ^ B)    => (~A | ~B | ~C) & (A | B | ~C) & (A | ~B | C) & (~A | B | C)
 // BUFF gate: (C = A)        => (~A | C) & (A | ~C)
 
-// One optimization I can do is build the final long clause with all the 
-// variables for each gate while doing to pair input and output clauses
-// this makes it harder to read tho so will keep it seperate for now
 int cnf::transform(const logic_gates& lg) 
 {
-    // convert each gate to CNF clauses
-
     for (const auto& gate : lg.gates) 
     {
         int output_var = get_var(gate.output);
+        // build a clause with all the inputs implying output
+        std::vector<int> clause;
 
         if (gate.type == gate_type::AND)
         {
             for (const auto& input : gate.inputs)
             {
                 int input_var = get_var(input);
+                // make a clause for each input implying output
                 clauses.push_back({input_var, -output_var});
-            }
-
-            std::vector<int> clause;
-            clause.push_back(output_var);
-        
-            for (const auto& input : gate.inputs)
-            {
-                int input_var = get_var(input);
+                // build the long clause for the other direction
                 clause.push_back(-input_var);
             }
 
+            clause.push_back(output_var);
             clauses.push_back(clause);
         }
         else if (gate.type == gate_type::NAND)
@@ -72,17 +64,10 @@ int cnf::transform(const logic_gates& lg)
             {
                 int input_var = get_var(input);
                 clauses.push_back({input_var, output_var});
-            }
-
-            std::vector<int> clause;
-            clause.push_back(-output_var);
-
-            for (const auto& input: gate.inputs)
-            {
-                int input_var = get_var(input);
                 clause.push_back(-input_var);
             }
 
+            clause.push_back(-output_var);
             clauses.push_back(clause);
         }
         else if (gate.type == gate_type::OR)
@@ -91,17 +76,10 @@ int cnf::transform(const logic_gates& lg)
             {
                 int input_var = get_var(input);
                 clauses.push_back({-input_var, output_var});
-            }
-
-            std::vector<int> clause;
-            clause.push_back(-output_var);
-        
-            for (const auto& input : gate.inputs)
-            {
-                int input_var = get_var(input);
                 clause.push_back(input_var);
             }
 
+            clause.push_back(-output_var);
             clauses.push_back(clause);
         }
         else if (gate.type == gate_type::NOR)
@@ -110,22 +88,20 @@ int cnf::transform(const logic_gates& lg)
             {
                 int input_var = get_var(input);
                 clauses.push_back({-input_var, -output_var});
-            }
-
-            std::vector<int> clause;
-            clause.push_back(output_var);
-
-            for (const auto& input : gate.inputs)
-            {
-                int input_var = get_var(input);
                 clause.push_back(input_var);
             }
 
+            clause.push_back(output_var);
             clauses.push_back(clause);
         }
         else if (gate.type == gate_type::NOT)
         {
-            // TODO: might want to verify that there is only one input
+            if (gate.inputs.size() != 1)
+            {
+                std::cout << "ERROR: NOT gate does not have one input" << std::endl;
+                return 1;
+            }
+
             int input_var = get_var(gate.inputs[0]);
 
             clauses.push_back({-input_var, -output_var});
@@ -133,9 +109,12 @@ int cnf::transform(const logic_gates& lg)
         }
         else if (gate.type == gate_type::XOR)
         {
-            // FIXME: assume gate has exactly two inputs
+            if (gate.inputs.size() != 2)
+            {
+                std::cout << "ERROR: XOR gate does not have two inputs" << std::endl;
+                return 1;
+            }
        
-            int output_var = get_var(gate.output);
             int input_var1 = get_var(gate.inputs[0]);
             int input_var2 = get_var(gate.inputs[1]);
 
@@ -146,7 +125,12 @@ int cnf::transform(const logic_gates& lg)
         } 
         else if (gate.type == gate_type::BUFF)
         {
-            // TODO: check if only one input too
+            if (gate.inputs.size() != 1)
+            {
+                std::cout << "ERROR: BUFF gate does not have one input" << std::endl;
+                return 1;
+            }
+            
             int input_var = get_var(gate.inputs[0]);
 
             clauses.push_back({-input_var, output_var});

@@ -32,5 +32,4 @@ test-c17:
 test-c432:
 	./bin/ec testcase/c432_A.bench testcase/c432_B.bench c432.dimacs
 
-
-.PHONY: build clean
+.PHONY: build bin clean

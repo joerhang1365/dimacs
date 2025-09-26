@@ -2,6 +2,12 @@
 #include <iostream>
 #include <algorithm>
 
+// a miter structure is used in equivalence checking by combining two circuits using XOR
+// gates on matching outputs. If the output of the XOR gate is true then the circuits are 
+// not equivalent. With multiple outputs connect all the XOR outputs to a single OR gate.
+// If the output of the OR gate is true then at least one XOR gate is true meaning the circuits
+// are not equivalent.
+
 logic_gates miter_structure(const logic_gates& lg_a, const logic_gates& lg_b)
 {
     // check that both circuits have the same primary inputs

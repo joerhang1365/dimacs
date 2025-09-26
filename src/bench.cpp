@@ -65,6 +65,17 @@ std::string type_to_string(const gate_type& type)
     }
 }
 
+// # bench file format
+// 
+// INPUT(name1)
+// INPUT(name2)
+// ...
+// OUTPUT(name)
+// OUTPUT(name2)
+// ...
+// output_pin1 = GATE(input1, input2, ...)
+// output_pin2 = GATE(input1)
+
 int logic_gates::parse_bench_file(const std::string& filename)
 {
     std::ifstream file;
@@ -181,9 +192,7 @@ void logic_gates::print() const
 
     for (const auto& gate : gates)
     {
-        std::cout << gate.output << " = ";
-        std::cout << type_to_string(gate.type);
-        std::cout << "(";
+        std::cout << gate.output << " = " << type_to_string(gate.type) << "(";
 
         for (size_t i = 0; i < gate.inputs.size(); i++)
         {
