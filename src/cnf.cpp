@@ -24,17 +24,17 @@ int cnf::get_var(const std::string& name)
 }
 
 // assign each gate primary input, primary output, and gate output to a unique
-// variable. Then find the CNF or conjunctive normal form clauses using the
+// variable. Then find the CNF or conjunctive normal form clauses using
 // Tseytin transformation
 
 // Tseytin transformations
-// AND gate:  (C = A & B)    => (~A | ~B | C) & (A | ~C) & (B | ~C)
-// NAND gate: (C = ~(A | B)) => (~A | ~B | ~C) & (A | C) & (B | C)
-// OR  gate:  (C = A | B)    => (A | B | ~C) & (~A | C) & (~B | C)
-// NOR gate:  (C = ~(A & B)) => (A | B | C) & (~A | ~C) & (~B | ~C)
-// NOT gate:  (C = ~A)       => (~A | ~C) & (A | C)
-// XOR gate:  (C = A ^ B)    => (~A | ~B | ~C) & (A | B | ~C) & (A | ~B | C) & (~A | B | C)
-// BUFF gate: (C = A)        => (~A | C) & (A | ~C)
+// AND  gate: (C = A & B)    -> (~A | ~B | C) & (A | ~C) & (B | ~C)
+// NAND gate: (C = ~(A | B)) -> (~A | ~B | ~C) & (A | C) & (B | C)
+// OR   gate: (C = A | B)    -> (A | B | ~C) & (~A | C) & (~B | C)
+// NOR  gate: (C = ~(A & B)) -> (A | B | C) & (~A | ~C) & (~B | ~C)
+// NOT  gate: (C = ~A)       -> (~A | ~C) & (A | C)
+// XOR  gate: (C = A ^ B)    -> (~A | ~B | ~C) & (A | B | ~C) & (A | ~B | C) & (~A | B | C)
+// BUFF gate: (C = A)        -> (~A | C) & (A | ~C)
 
 int cnf::transform(const logic_gates& lg) 
 {
