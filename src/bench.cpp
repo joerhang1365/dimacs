@@ -80,7 +80,7 @@ int logic_gates::parse_bench_file(const std::string& filename)
 {
     std::ifstream file;
     
-    file.open(filename);
+    file.open(filename.c_str());
 
     if (!file.is_open())
     {
@@ -208,4 +208,8 @@ void logic_gates::print() const
     }
 
     std::cout << "\n";
+
+    std::cout << "Number of inputs: " << primary_inputs.size() << std::endl;
+    std::cout << "Number of outputs: " << primary_outputs.size() << std::endl;
+    std::cout << "Number of gates: " << gates.size() << std::endl;
 }

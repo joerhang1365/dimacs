@@ -24,7 +24,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    circuit_a.print();
+    //circuit_a.print();
 
     if (circuit_b.parse_bench_file(argv[2]) != 0)
     {
@@ -32,10 +32,10 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    circuit_b.print();
+    //circuit_b.print();
 
     miter = miter_structure(circuit_a, circuit_b);
-    miter.print();
+    //miter.print();
 
     cnf.transform(miter);
     cnf.print_dimacs_file(argv[3]);

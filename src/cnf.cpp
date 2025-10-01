@@ -156,7 +156,7 @@ void cnf::print_dimacs_file(const std::string& filename) const
     }
 
     std::ofstream dimacs_file;
-    dimacs_file.open(new_filename);
+    dimacs_file.open(new_filename.c_str());
 
     if (!dimacs_file.is_open()) 
     {

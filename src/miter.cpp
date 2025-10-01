@@ -14,14 +14,14 @@ logic_gates miter_structure(const logic_gates& lg_a, const logic_gates& lg_b)
     // of not return empty logic_gates structure
     if (lg_a.primary_inputs != lg_b.primary_inputs)
     {
-        std::cout << "Error: circuits have different primary inputs" << std::endl;
+        std::cout << "ERROR: circuits have different primary inputs" << std::endl;
         return logic_gates();
     }
 
     // check that both circuits have the same primary outputs
     if (lg_a.primary_outputs != lg_b.primary_outputs) 
     {
-        std::cout << "Error: circuits have different number of primary outputs" << std::endl;
+        std::cout << "ERROR: circuits have different number of primary outputs" << std::endl;
         return logic_gates();
     }
 
